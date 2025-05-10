@@ -9,6 +9,7 @@
 *.geojson
 Schrott/
 !output/
+!output/**
 
 
 __pycache__/
