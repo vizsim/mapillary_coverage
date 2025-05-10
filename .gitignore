@@ -8,6 +8,8 @@
 *.json
 *.geojson
 Schrott/
+!output/
+
 
 __pycache__/
 *.pyc
