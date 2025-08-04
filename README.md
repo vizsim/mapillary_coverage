@@ -1,6 +1,7 @@
 # Mapillary Coverage
 
 A set of Jupyter notebooks that return data on which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
+For detailed information on Mapillary coverage tiles, refer to the [official Mapillary API documentation](https://www.mapillary.com/developer/api-documentation?locale=de_DE#coverage-tiles-computed).
 
 ## Process
 
@@ -10,7 +11,7 @@ This process is not perfect but represents a good compromise in terms of data so
 
 ## Result
 
-The [`/output`folder](/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
+The [`/output`folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
 
 ## License
-See the [LICENSE](LICENSE.md) file for license rights and limitations (MIT).
+See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
