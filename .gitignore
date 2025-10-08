@@ -11,7 +11,9 @@ Schrott/
 !output/
 !output/**
 
+!prep/tile_cache/*.json
 
+.venv/
 __pycache__/
 *.pyc
 *.log  
