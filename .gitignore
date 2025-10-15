@@ -13,6 +13,7 @@ Schrott/
 
 !prep/tile_cache/*.json
 
+archive/
 .venv/
 __pycache__/
 *.pyc
