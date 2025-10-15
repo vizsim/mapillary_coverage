@@ -1,6 +1,6 @@
 *.csv
 *.txt
-!requirements.txt
+
 *.gpkg
 *.parquet
 *.pbf
@@ -8,10 +8,7 @@
 *.json
 *.geojson
 Schrott/
-!output/
-!output/**
 
-!prep/tile_cache/*.json
 
 archive/
 .venv/
@@ -19,3 +16,13 @@ __pycache__/
 *.pyc
 *.log  
 *.ipynb_checkpoints
+
+
+
+!output/
+!output/**
+
+!prep/tile_cache/*.json
+
+!config.example.json
+!requirements.txt
