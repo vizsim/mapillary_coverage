@@ -15,3 +15,8 @@ The [`/output`folder](https://github.com/vizsim/mapillary_coverage/tree/main/out
 
 ## License
 See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
+
+## Setup
+
+1. Copy `config.example.py` to `config.py` and add your Mapillary Authentication Token from https://www.mapillary.com/dashboard/developers
+2. Run the Jupyter Notebooks step by step

@@ -14,7 +14,7 @@ archive/
 .venv/
 __pycache__/
 *.pyc
-*.log  
+*.log
 *.ipynb_checkpoints
 
 
@@ -24,5 +24,5 @@ __pycache__/
 
 !prep/tile_cache/*.json
 
-!config.example.json
+config.py
 !requirements.txt
