@@ -11,13 +11,8 @@ This process is not perfect but represents a good compromise in terms of data so
 
 ## Result
 
-The [`/output`folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
+The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
 
 ## License
 
 See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
-
-## Setup
-
-1. Copy `config.example.py` to `config.py` and add your Mapillary Authentication Token from https://www.mapillary.com/dashboard/developers
-2. Run the Jupyter Notebooks step by step
