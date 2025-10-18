@@ -10,13 +10,14 @@ GEOFABRIK_DOWNLOAD_FOLDER = "osm_geofabrik_pbf"
 GEOFABRIK_PROCESSED_FOLDER = "processed_osm_files"
 
 # File Processing Configuration
+MIN_CAPTURE_DATE = "2023-01-01"  # YYYY-MM-DD
 BUFFER_DISTANCE = 10  # meters
 OUTPUT_FOLDER = "output"
 ML_OUTPUT_FOLDER = "ml_output"
 
 # Tile Configuration (for Mapillary coverage)
 TILE_CACHE_FOLDER = "prep/tile_cache"
-TILE_ZOOM_LEVEL = 14
+#TILE_ZOOM_LEVEL = 14  # only 14 works anyway
 
 # Convenience dictionaries for easy access
 GEOFABRIK_CONFIG = {
@@ -26,6 +27,7 @@ GEOFABRIK_CONFIG = {
 }
 
 PROCESSING_CONFIG = {
+    'min_capture_date': MIN_CAPTURE_DATE,
     'buffer_distance': BUFFER_DISTANCE,
     'output_folder': OUTPUT_FOLDER,
     'ml_output_folder': ML_OUTPUT_FOLDER
@@ -37,5 +39,5 @@ MAPILLARY_CONFIG = {
 
 TILES_CONFIG = {
     'cache_folder': TILE_CACHE_FOLDER,
-    'zoom_level': TILE_ZOOM_LEVEL
+#    'zoom_level': TILE_ZOOM_LEVEL
 }
