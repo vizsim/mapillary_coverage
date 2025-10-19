@@ -20,7 +20,7 @@ __pycache__/
 
 
 !output/
-!output/**
+#!output/**
 
 !prep/tile_cache/*.json
 
