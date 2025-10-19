@@ -12,8 +12,10 @@ GEOFABRIK_PROCESSED_FOLDER = "processed_osm_files"
 # File Processing Configuration
 MIN_CAPTURE_DATE = "2023-01-01"  # YYYY-MM-DD
 BUFFER_DISTANCE = 10  # meters
+MP_COVERAGE_RATIO_THRESHOLD = 0.6 # 60% coverage
 OUTPUT_FOLDER = "output"
 ML_OUTPUT_FOLDER = "ml_output"
+PBF_TO_PARQUET = "ogr2ogr" #["geopandas","ogr2ogr"]
 
 # Tile Configuration (for Mapillary coverage)
 TILE_CACHE_FOLDER = "prep/tile_cache"
@@ -29,8 +31,10 @@ GEOFABRIK_CONFIG = {
 PROCESSING_CONFIG = {
     'min_capture_date': MIN_CAPTURE_DATE,
     'buffer_distance': BUFFER_DISTANCE,
+    'mp_coverage_ratio_threshold': MP_COVERAGE_RATIO_THRESHOLD,
     'output_folder': OUTPUT_FOLDER,
-    'ml_output_folder': ML_OUTPUT_FOLDER
+    'ml_output_folder': ML_OUTPUT_FOLDER,
+    'pbf_to_parquet': PBF_TO_PARQUET
 }
 
 MAPILLARY_CONFIG = {
