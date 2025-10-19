@@ -24,5 +24,7 @@ __pycache__/
 
 !prep/tile_cache/*.json
 
+!*_metadata.json
+
 config.py
 !requirements.txt
