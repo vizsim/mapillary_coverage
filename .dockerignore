@@ -21,6 +21,8 @@ env/
 .git
 .gitignore
 
+.env
+
 # ignore docker files
 # docker/
 
