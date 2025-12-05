@@ -10,9 +10,9 @@ services:
     # Repo vom Host in den Container mounten (optional, aber praktisch beim Entwickeln)
     volumes:
       - ..:/app
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
+#    dns:
+#      - 1.1.1.1
+#      - 8.8.8.8
     # Wenn du per SSH-Key zu GitHub pushen willst (später möglich):
     # - ~/.ssh:/root/.ssh:ro
     mem_limit: 6g
