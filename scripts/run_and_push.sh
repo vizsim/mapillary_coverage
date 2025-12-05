@@ -12,10 +12,18 @@ echo "🔄 Git: Hole neuesten Stand auf Branch $BRANCH..."
 git checkout "$BRANCH"
 git pull --rebase origin "$BRANCH"
 
-echo "🐳 Starte Docker-Pipeline..."
+echo "🐳 Starte Docker-Pipeline (mit VPN)..."
 cd docker
-docker-compose down
-docker-compose up --build
+
+# 1) Existierende Container sauber runterfahren
+docker-compose -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
+
+# 2) Worker im VPN laufen lassen (blockierend, bis fertig)
+docker-compose -f docker-compose.yml -f docker-compose.vpn.yml up --build mapillary_worker
+
+# Optional: danach alles wieder aufräumen
+docker-compose -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans
+
 cd ..
 
 echo "✅ Docker-Pipeline fertig."
@@ -64,11 +72,3 @@ echo "🚀 Push nach GitHub..."
 git push origin "$BRANCH"
 
 echo "🎉 Fertig — Änderungen sind online!"
-
-
-
-
-
-
-
-
