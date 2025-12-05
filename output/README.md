@@ -3,8 +3,8 @@
 This folder contains the **latest** output file for *Mapillary coverage per OSM highway analysis*.
 
 **Data created:** 2025-12-05<br>
-**OSM data:** 2025-12-03<br>
-**Mapillary data:** 2023-01-01 → 2025-10-18<br>
+**OSM data:** 2025-12-04<br>
+**Mapillary data:** 2023-01-01 → 2025-12-05<br>
 **Buffer distance:** 10 meters<br>
 **Coverage ratio threshold:** 0.6 (60%)
 
