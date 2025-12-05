@@ -1,0 +1,27 @@
+FROM python:3.12-slim
+
+# Basis-Settings
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+# Systempakete (git, osmium-tool)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       git \
+       osmium-tool \
+    && rm -rf /var/lib/apt/lists/*
+
+# Requirements ins Image
+# ➜ jupyterlab & nbconvert bitte einfach in requirements.txt mit reinnehmen
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Restliches Repo
+COPY . .
+
+# Standard-Command: Notebook ausführen
+CMD ["bash", "scripts/run_mapillary_notebooks.sh"]
