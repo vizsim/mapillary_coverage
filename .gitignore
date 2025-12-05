@@ -17,6 +17,7 @@ __pycache__/
 *.log
 *.ipynb_checkpoints
 
+.env
 
 
 !output/
