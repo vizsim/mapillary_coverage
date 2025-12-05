@@ -14,6 +14,7 @@ git pull --rebase origin "$BRANCH"
 
 echo "🐳 Starte Docker-Pipeline..."
 cd docker
+docker-compose down
 docker-compose up --build
 cd ..
 
