@@ -27,6 +27,7 @@ matplotlib-inline==0.1.7
 mercantile==1.2.1
 nest-asyncio==1.6.0
 numpy==2.3.2
+osmium==4.2.0
 packaging==25.0
 pandas==2.3.1
 parso==0.8.4
@@ -48,6 +49,7 @@ python-dateutil==2.9.0.post0
 pytz==2025.2
 pyzmq==27.0.1
 requests==2.32.4
+setuptools==80.9.0
 shapely==2.1.1
 six==1.17.0
 stack-data==0.6.3
@@ -58,3 +60,5 @@ tzdata==2025.2
 urllib3==2.5.0
 vt2geojson==0.2.1
 wcwidth==0.2.13
+wheel==0.45.1
+nbconvert
