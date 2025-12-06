@@ -29,7 +29,7 @@ cd ..
 echo "✅ Docker-Pipeline fertig."
 
 # ---------------------------
-# 🔎 Prüfen, ob Dateien existieren
+# 🔎 Prüfen, ob Output-Dateien existieren
 # ---------------------------
 
 if [ ! -f "$CSV_PATH" ]; then
@@ -43,24 +43,31 @@ if [ ! -f "$README_PATH" ]; then
 fi
 
 # ---------------------------
-# ➕ Dateien zum Commit hinzufügen
+# ➕ Dateien zum Commit hinzufügen (Outputs, Notebooks, Metadata)
 # ---------------------------
 echo "➕ Füge Dateien zum Commit hinzu..."
 git add "$CSV_PATH"
 git add "$README_PATH"
+git add 1a_prepare_osm-network_from_pbf_bundesland.ipynb
+git add 1b_get_mapillary_coverage.ipynb
+git add 2_create_mapillary_coverage_buffer.ipynb
+git add 3_merge_mp-cov_with_osm_use_case_germany.ipynb
+git add 4_provide_mp-osm_coverage_csv_new.ipynb
+git add ml_metadata.json
+git add osm_metadata.json
 
 # ---------------------------
 # 🧹 Prüfen, ob es Änderungen gibt
 # ---------------------------
 if git diff --cached --quiet; then
-  echo "ℹ️ Keine Änderungen an CSV oder README — nichts zu committen."
+  echo "ℹ️ Keine Änderungen an Outputs, Notebooks oder Metadata — nichts zu committen."
   exit 0
 fi
 
 # ---------------------------
 # ✍️ Commit erstellen
 # ---------------------------
-COMMIT_MSG="Auto-update CSV + README ($(date -Iseconds))"
+COMMIT_MSG="Auto-update: outputs, notebooks, metadata ($(date -Iseconds))"
 
 echo "✍️ Committe Änderungen: $COMMIT_MSG"
 git commit -m "$COMMIT_MSG"
