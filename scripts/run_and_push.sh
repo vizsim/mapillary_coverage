@@ -46,15 +46,15 @@ fi
 # ➕ Dateien zum Commit hinzufügen (Outputs, Notebooks, Metadata)
 # ---------------------------
 echo "➕ Füge Dateien zum Commit hinzu..."
-git add "$CSV_PATH"
-git add "$README_PATH"
-git add 1a_prepare_osm-network_from_pbf_bundesland.ipynb
-git add 1b_get_mapillary_coverage.ipynb
-git add 2_create_mapillary_coverage_buffer.ipynb
-git add 3_merge_mp-cov_with_osm_use_case_germany.ipynb
-git add 4_provide_mp-osm_coverage_csv_new.ipynb
-git add ml_metadata.json
-git add osm_metadata.json
+git add -f "$CSV_PATH"
+git add -f "$README_PATH"
+git add -f 1a_prepare_osm-network_from_pbf_bundesland.ipynb
+git add -f 1b_get_mapillary_coverage.ipynb
+git add -f 2_create_mapillary_coverage_buffer.ipynb
+git add -f 3_merge_mp-cov_with_osm_use_case_germany.ipynb
+git add -f 4_provide_mp-osm_coverage_csv_new.ipynb
+git add -f ml_metadata.json
+git add -f osm_metadata.json
 
 # ---------------------------
 # 🧹 Prüfen, ob es Änderungen gibt
