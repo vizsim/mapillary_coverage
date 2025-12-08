@@ -5,7 +5,6 @@
 MAPILLARY_ACCESS_TOKEN = "MLY|XYXYXYXYXYX"  # Replace with your actual token
 
 # Geofabrik OSM Data Configuration
-GEOFABRIK_PBF_URL = "https://download.geofabrik.de/europe/germany-latest.osm.pbf"  # Change this to switch regions
 GEOFABRIK_DOWNLOAD_FOLDER = "osm_geofabrik_pbf"
 GEOFABRIK_PROCESSED_FOLDER = "processed_osm_files"
 
@@ -15,22 +14,21 @@ GEOFABRIK_PROCESSED_FOLDER = "processed_osm_files"
 # Examples: ["DE-BE"] for Berlin only, ["DE-BE", "DE-BB"] for Berlin and Brandenburg
 # Available: DE-BW, DE-BY, DE-BE, DE-BB, DE-HB, DE-HH, DE-HE, DE-MV, DE-NI, DE-NW, DE-RP, DE-SL, DE-SN, DE-ST, DE-SH, DE-TH
 BUNDESLAENDER = None  # Process all by default
+# BUNDESLAENDER = ["DE-HB"] 
 
 # File Processing Configuration
 MIN_CAPTURE_DATE = "2023-01-01"  # YYYY-MM-DD
 BUFFER_DISTANCE = 10  # meters
 MP_COVERAGE_RATIO_THRESHOLD = 0.6 # 60% coverage
+MAX_FILE_AGE_DAYS = 4  # Maximum age in days before reprocessing files
 OUTPUT_FOLDER = "output"
 ML_OUTPUT_FOLDER = "ml_output"
-PBF_TO_PARQUET = "ogr2ogr" #["geopandas","ogr2ogr"]
 
 # Tile Configuration (for Mapillary coverage)
 TILE_CACHE_FOLDER = "prep/tile_cache"
-#TILE_ZOOM_LEVEL = 14  # only 14 works anyway
 
 # Convenience dictionaries for easy access
 GEOFABRIK_CONFIG = {
-    'pbf_url': GEOFABRIK_PBF_URL,
     'download_folder': GEOFABRIK_DOWNLOAD_FOLDER,
     'processed_folder': GEOFABRIK_PROCESSED_FOLDER,
     'bundeslaender': BUNDESLAENDER
@@ -40,9 +38,9 @@ PROCESSING_CONFIG = {
     'min_capture_date': MIN_CAPTURE_DATE,
     'buffer_distance': BUFFER_DISTANCE,
     'mp_coverage_ratio_threshold': MP_COVERAGE_RATIO_THRESHOLD,
+    'max_file_age_days': MAX_FILE_AGE_DAYS,
     'output_folder': OUTPUT_FOLDER,
-    'ml_output_folder': ML_OUTPUT_FOLDER,
-    'pbf_to_parquet': PBF_TO_PARQUET
+    'ml_output_folder': ML_OUTPUT_FOLDER
 }
 
 MAPILLARY_CONFIG = {
@@ -50,6 +48,5 @@ MAPILLARY_CONFIG = {
 }
 
 TILES_CONFIG = {
-    'cache_folder': TILE_CACHE_FOLDER,
-#    'zoom_level': TILE_ZOOM_LEVEL
+    'cache_folder': TILE_CACHE_FOLDER
 }
