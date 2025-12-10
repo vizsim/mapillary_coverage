@@ -35,4 +35,6 @@ osm_geofabrik_pbf/
 cache/
 archive/
 
+!prep/bundeslaender.geojson
+
 # ignore everything that shouldn't be in the Docker image
