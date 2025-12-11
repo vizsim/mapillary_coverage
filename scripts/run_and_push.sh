@@ -53,8 +53,8 @@ git add -f 1b_get_mapillary_coverage.ipynb
 git add -f 2_create_mapillary_coverage_buffer.ipynb
 git add -f 3_merge_mp-cov_with_osm_use_case_germany.ipynb
 git add -f 4_provide_mp-osm_coverage_csv_new.ipynb
-git add -f ml_metadata.json
-git add -f osm_metadata.json
+git add -f output/ml_metadata.json
+git add -f output/osm_metadata.json
 
 # ---------------------------
 # 🧹 Prüfen, ob es Änderungen gibt
