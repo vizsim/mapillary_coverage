@@ -1,24 +1,51 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import subprocess
 import sys
 from typing import Sequence
 
-from mapillary_coverage.notebooks import NotebookSpec
+
+@dataclass(frozen=True)
+class PipelineStep:
+    step_id: str
+    label: str
+    cli_subcommand: str
 
 
-def build_nbconvert_command(notebook_path: Path) -> list[str]:
-    return [
-        "jupyter",
-        "nbconvert",
-        "--to",
-        "notebook",
-        "--inplace",
-        "--execute",
-        str(notebook_path.name),
-    ]
+PIPELINE_STEPS: tuple[PipelineStep, ...] = (
+    PipelineStep(
+        step_id="1a",
+        label="Prepare OSM network from PBF per Bundesland",
+        cli_subcommand="prepare-osm",
+    ),
+    PipelineStep(
+        step_id="1b",
+        label="Get Mapillary coverage",
+        cli_subcommand="download-mapillary",
+    ),
+    PipelineStep(
+        step_id="2",
+        label="Create Mapillary coverage buffer",
+        cli_subcommand="create-buffer",
+    ),
+    PipelineStep(
+        step_id="3",
+        label="Merge Mapillary coverage with OSM highways",
+        cli_subcommand="merge-coverage",
+    ),
+    PipelineStep(
+        step_id="4",
+        label="Provide Mapillary OSM coverage CSV",
+        cli_subcommand="export-csv",
+    ),
+)
+
+
+def get_pipeline_steps() -> list[PipelineStep]:
+    return list(PIPELINE_STEPS)
 
 
 def _truthy_env(value: str | None) -> bool:
@@ -28,37 +55,30 @@ def _truthy_env(value: str | None) -> bool:
 
 
 def build_step_command(
-    notebook: NotebookSpec,
+    step: PipelineStep,
     project_root: Path,
     *,
     dry_run: bool = False,
     env: dict[str, str] | None = None,
 ) -> list[str]:
-    notebook_path = notebook.path(project_root)
-    if not notebook_path.exists():
-        raise FileNotFoundError(f"Notebook not found: {notebook_path}")
-
-    if notebook.cli_subcommand is None:
-        return build_nbconvert_command(notebook_path)
-
     effective_env = env or os.environ.copy()
     command = [
         sys.executable,
         "-m",
         "mapillary_coverage",
-        notebook.cli_subcommand,
+        step.cli_subcommand,
         "--project-root",
         str(project_root),
     ]
 
-    if notebook.step_id == "1a":
+    if step.step_id == "1a":
         if dry_run:
             command.append("--dry-run")
         if _truthy_env(effective_env.get("MAPILLARY_COVERAGE_NO_NETWORK")):
             command.append("--no-network")
         return command
 
-    if notebook.step_id == "1b":
+    if step.step_id == "1b":
         if dry_run:
             command.append("--dry-run")
         output_folder = effective_env.get("MAPILLARY_COVERAGE_ML_OUTPUT_FOLDER")
@@ -75,7 +95,7 @@ def build_step_command(
             command.extend(["--limit-tiles", limit_tiles])
         return command
 
-    if notebook.step_id == "2":
+    if step.step_id == "2":
         if dry_run:
             command.append("--dry-run")
         source_folder = effective_env.get("MAPILLARY_COVERAGE_SOURCE_ML_OUTPUT_FOLDER")
@@ -86,7 +106,7 @@ def build_step_command(
             command.extend(["--output-folder", output_folder])
         return command
 
-    if notebook.step_id == "3":
+    if step.step_id == "3":
         if dry_run:
             command.append("--dry-run")
         else:
@@ -99,7 +119,7 @@ def build_step_command(
             command.extend(["--max-roads", max_roads])
         return command
 
-    if notebook.step_id == "4":
+    if step.step_id == "4":
         if dry_run:
             command.append("--dry-run")
         source_output_folder = effective_env.get("MAPILLARY_COVERAGE_SOURCE_OUTPUT_FOLDER")
@@ -113,15 +133,15 @@ def build_step_command(
     return command
 
 
-def run_notebook(
-    notebook: NotebookSpec,
+def run_step(
+    step: PipelineStep,
     project_root: Path,
     *,
     dry_run: bool = False,
     env: dict[str, str] | None = None,
 ) -> int:
     command = build_step_command(
-        notebook,
+        step,
         project_root,
         dry_run=dry_run,
         env=env,
@@ -140,21 +160,21 @@ def run_notebook(
 
 
 def run_pipeline(
-    notebooks: Sequence[NotebookSpec],
+    steps: Sequence[PipelineStep],
     project_root: Path,
     *,
     dry_run: bool = False,
     env: dict[str, str] | None = None,
 ) -> int:
-    for notebook in notebooks:
-        print(f"Running notebook {notebook.step_id}: {notebook.filename}")
-        exit_code = run_notebook(
-            notebook,
+    for step in steps:
+        print(f"Running step {step.step_id}: {step.label}")
+        exit_code = run_step(
+            step,
             project_root,
             dry_run=dry_run,
             env=env,
         )
         if exit_code != 0:
             return exit_code
-        print(f"Finished notebook {notebook.step_id}: {notebook.filename}")
+        print(f"Finished step {step.step_id}: {step.label}")
     return 0

@@ -15,7 +15,6 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Requirements ins Image
-# ➜ jupyterlab & nbconvert bitte einfach in requirements.txt mit reinnehmen
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
@@ -23,5 +22,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Restliches Repo
 COPY . .
 
-# Standard-Command: Notebook ausführen
-CMD ["bash", "scripts/run_mapillary_notebooks.sh"]
+# Standard-Command: CLI-Pipeline ausführen
+CMD ["bash", "scripts/run_mapillary_pipeline.sh"]

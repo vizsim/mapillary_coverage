@@ -11,9 +11,8 @@ from mapillary_coverage.bundeslaender import get_bundesland_urls
 from mapillary_coverage.export import run_export_csv_pipeline
 from mapillary_coverage.mapillary import run_mapillary_download_pipeline
 from mapillary_coverage.merge import run_merge_coverage_pipeline
-from mapillary_coverage.notebooks import NOTEBOOK_SPECS, get_notebook, get_pipeline
 from mapillary_coverage.osm import run_osm_prepare_pipeline
-from mapillary_coverage.runner import build_step_command, run_notebook, run_pipeline
+from mapillary_coverage.runner import get_pipeline_steps, run_pipeline
 from mapillary_coverage.settings import get_settings
 
 
@@ -41,57 +40,25 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output format for rendered settings.",
     )
 
-    list_notebooks = subparsers.add_parser(
-        "list-notebooks",
-        help="List registered notebook steps.",
-    )
-    list_notebooks.add_argument(
-        "--include-optional",
-        action="store_true",
-        help="Include optional steps such as notebook 0.",
-    )
-
-    run_notebook_parser = subparsers.add_parser(
-        "run-notebook",
-        help="Execute a single notebook step via nbconvert.",
-    )
-    run_notebook_parser.add_argument("step_id", help="Notebook step id, for example 1a or 4.")
-    run_notebook_parser.add_argument(
-        "--project-root",
-        type=Path,
-        default=None,
-        help="Project root that contains the notebooks.",
-    )
-    run_notebook_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the nbconvert command without executing it.",
-    )
-
     run_pipeline_parser = subparsers.add_parser(
         "run-pipeline",
-        help="Execute the notebook pipeline in the current production order.",
+        help="Execute the pipeline in the current production order.",
     )
     run_pipeline_parser.add_argument(
         "--project-root",
         type=Path,
         default=None,
-        help="Project root that contains the notebooks.",
-    )
-    run_pipeline_parser.add_argument(
-        "--include-prepare-tiles",
-        action="store_true",
-        help="Include notebook 0 before the default pipeline.",
+        help="Project root that contains config and output folders.",
     )
     run_pipeline_parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print notebook commands without executing them.",
+        help="Print pipeline step commands without executing them.",
     )
 
     download_mapillary_parser = subparsers.add_parser(
         "download-mapillary",
-        help="Run or plan the Mapillary coverage download step from notebook 1b.",
+        help="Run or plan the Mapillary coverage download step.",
     )
     download_mapillary_parser.add_argument(
         "--project-root",
@@ -140,7 +107,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     prepare_osm_parser = subparsers.add_parser(
         "prepare-osm",
-        help="Run or plan the OSM download and filtering step from notebook 1a.",
+        help="Run or plan the OSM download and filtering step.",
     )
     prepare_osm_parser.add_argument(
         "--project-root",
@@ -167,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     create_buffer_parser = subparsers.add_parser(
         "create-buffer",
-        help="Run or plan the Mapillary coverage buffering step from notebook 2.",
+        help="Run or plan the Mapillary coverage buffering step.",
     )
     create_buffer_parser.add_argument(
         "--project-root",
@@ -199,7 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     merge_coverage_parser = subparsers.add_parser(
         "merge-coverage",
-        help="Plan the merge coverage step from notebook 3.",
+        help="Plan the merge coverage step.",
     )
     merge_coverage_parser.add_argument(
         "--project-root",
@@ -237,7 +204,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     export_csv_parser = subparsers.add_parser(
         "export-csv",
-        help="Run or plan the CSV and README export step from notebook 4.",
+        help="Run or plan the CSV and README export step.",
     )
     export_csv_parser.add_argument(
         "--project-root",
@@ -284,35 +251,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(rendered, indent=2, sort_keys=True))
         return 0
 
-    if args.command == "list-notebooks":
-        for spec in NOTEBOOK_SPECS:
-            if not args.include_optional and not spec.default_pipeline:
-                continue
-            print(f"{spec.step_id}\t{spec.filename}\t{spec.label}")
-        return 0
-
-    if args.command == "run-notebook":
-        project_root = args.project_root.resolve() if args.project_root else Path.cwd()
-        notebook = get_notebook(args.step_id)
-        command = build_step_command(
-            notebook,
-            project_root,
-            dry_run=args.dry_run,
-            env=os.environ.copy(),
-        )
-        print(f"Notebook {notebook.step_id}: {' '.join(command)}")
-        return run_notebook(
-            notebook,
-            project_root,
-            dry_run=args.dry_run,
-            env=os.environ.copy(),
-        )
-
     if args.command == "run-pipeline":
         project_root = args.project_root.resolve() if args.project_root else Path.cwd()
-        notebooks = get_pipeline(include_prepare_tiles=args.include_prepare_tiles)
+        steps = get_pipeline_steps()
         return run_pipeline(
-            notebooks,
+            steps,
             project_root,
             dry_run=args.dry_run,
             env=os.environ.copy(),

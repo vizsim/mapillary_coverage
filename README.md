@@ -3,7 +3,7 @@
 A pipeline for determining which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
 For detailed information on Mapillary coverage tiles, refer to the [official Mapillary API documentation](https://www.mapillary.com/developer/api-documentation?locale=de_DE#coverage-tiles-computed).
 
-The repository still contains the original notebooks, but the main pipeline steps can now be executed through the Python package and CLI as well.
+The production workflow is CLI-only.
 
 ## Secrets
 
@@ -15,6 +15,14 @@ Use one of these two paths instead:
 - Copy `config/local.toml.example` to `config/local.toml` and set the token there. `config/local.toml` is ignored by git.
 
 If no token is configured, the Mapillary download step fails fast with a clear error message.
+
+## Configuration
+
+The config surface is now:
+
+- `config/default.toml`: tracked project defaults
+- `config/local.toml`: optional local overrides, ignored by git
+- `config/local.toml.example`: copy template for local overrides
 
 ## Process
 
@@ -29,7 +37,6 @@ After creating or activating the virtual environment, the package can be execute
 Useful commands:
 
 - `mapillary-coverage show-config`
-- `mapillary-coverage list-notebooks`
 - `mapillary-coverage run-pipeline --dry-run`
 - `mapillary-coverage prepare-osm --dry-run --no-network --bundeslaender DE-HH`
 - `mapillary-coverage download-mapillary --dry-run --bundeslaender DE-HH`
@@ -37,7 +44,7 @@ Useful commands:
 - `mapillary-coverage merge-coverage --dry-run --bundeslaender DE-HH`
 - `mapillary-coverage export-csv --dry-run --bundeslaender DE-HH`
 
-The production shell entrypoint is [scripts/run_mapillary_notebooks.sh](/home/simon/mapillary_coverage/scripts/run_mapillary_notebooks.sh). Despite the historic name, it now delegates to the CLI pipeline runner.
+The production shell entrypoint is [scripts/run_mapillary_pipeline.sh](/home/simon/mapillary_coverage/scripts/run_mapillary_pipeline.sh).
 
 ## Targeted Validation
 

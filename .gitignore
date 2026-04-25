@@ -28,6 +28,4 @@ config/local.toml
 !prep/bundeslaender.geojson
 
 !*_metadata.json
-
-config.py
 !requirements.txt
