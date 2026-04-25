@@ -12,4 +12,7 @@ access_token = ""
 # max_file_age_days = 4
 
 [tiles]
-# cache_folder = "prep/tile_cache"
+# cache_folder = "data/cache/tile_cache"
+
+[reference]
+# bundeslaender_geojson = "resources/bundeslaender.geojson"

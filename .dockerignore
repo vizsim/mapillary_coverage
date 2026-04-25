@@ -27,14 +27,19 @@ env/
 # docker/
 
 # ignore data directories, if exist
-data/
 output/
 ml_output/
 processed_osm_files/
 osm_geofabrik_pbf/
-cache/
+prep/
+data/osm/
+data/mapillary/
+data/cache/
 archive/
 
-!prep/bundeslaender.geojson
+!data/cache/
+!data/cache/tile_cache/
+!data/cache/tile_cache/*.json
+!resources/bundeslaender.geojson
 
 # ignore everything that shouldn't be in the Docker image

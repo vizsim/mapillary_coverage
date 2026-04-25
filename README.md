@@ -24,6 +24,33 @@ The config surface is now:
 - `config/local.toml`: optional local overrides, ignored by git
 - `config/local.toml.example`: copy template for local overrides
 
+Default internal paths are now grouped more clearly:
+
+- `resources/bundeslaender.geojson`: checked-in reference geometry
+- `data/cache/tile_cache`: checked-in tile cache JSONs
+- `data/osm/raw`: downloaded Geofabrik PBFs
+- `data/osm/processed`: processed OSM highway PBFs
+- `data/mapillary/coverage`: intermediate Mapillary artifacts and logs
+- `output`: final externally consumed deliverables
+
+Directory layout:
+
+```text
+.
+|-- config/
+|-- resources/
+|   `-- bundeslaender.geojson
+|-- data/
+|   |-- cache/
+|   |   `-- tile_cache/
+|   |-- osm/
+|   |   |-- raw/
+|   |   `-- processed/
+|   `-- mapillary/
+|       `-- coverage/
+`-- output/
+```
+
 ## Setup
 
 The repository uses `uv` as the single dependency and environment manager.

@@ -5,8 +5,8 @@ access_token = ""
 
 [geofabrik]
 # Leave bundeslaender unset to process all states.
-download_folder = "osm_geofabrik_pbf"
-processed_folder = "processed_osm_files"
+download_folder = "data/osm/raw"
+processed_folder = "data/osm/processed"
 
 [processing]
 # Rolling freshness window: Berlin start-of-day minus freshness_lookback_months.
@@ -16,7 +16,10 @@ buffer_distance = 10
 mp_coverage_ratio_threshold = 0.6
 max_file_age_days = 4
 output_folder = "output"
-ml_output_folder = "ml_output"
+ml_output_folder = "data/mapillary/coverage"
 
 [tiles]
-cache_folder = "prep/tile_cache"
+cache_folder = "data/cache/tile_cache"
+
+[reference]
+bundeslaender_geojson = "resources/bundeslaender.geojson"
