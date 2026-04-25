@@ -28,4 +28,3 @@ config/local.toml
 !prep/bundeslaender.geojson
 
 !*_metadata.json
-!requirements.txt
