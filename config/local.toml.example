@@ -1,0 +1,14 @@
+# Optional local overrides. Copy to config/local.toml and adjust as needed.
+# This file is gitignored via config/local.toml, so secrets stay local.
+
+[mapillary]
+access_token = "MLY|XYXYXYXYXYX"
+
+[geofabrik]
+# bundeslaender = ["DE-BE"]
+
+[processing]
+# max_file_age_days = 4
+
+[tiles]
+# cache_folder = "prep/tile_cache"

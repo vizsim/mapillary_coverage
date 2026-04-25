@@ -1,7 +1,23 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-cd /app   # im Container ist /app dein Repo
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+cd "$REPO_DIR"
+
+export PYTHONPATH="${REPO_DIR}/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ -x "${REPO_DIR}/.venv/bin/python" ]]; then
+  PYTHON_BIN="${REPO_DIR}/.venv/bin/python"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python)"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_BIN="$(command -v python3)"
+else
+  echo "No Python interpreter found."
+  exit 127
+fi
 
 # tqdm in Docker-Run deaktivieren, damit die Logs nicht zugespammt werden
 export TQDM_DISABLE=1
@@ -13,70 +29,40 @@ echo
 (
   while true; do
     ts=$(date +"%H:%M:%S")
-    mem=$(cat /sys/fs/cgroup/memory.current 2>/dev/null || cat /sys/fs/cgroup/memory/memory.usage_in_bytes)
-    mem_mb=$(awk "BEGIN {printf \"%.2f\", $mem/1024/1024}")
-    echo "[$ts] RAM usage: ${mem_mb} MB"
+    if [[ -r /sys/fs/cgroup/memory.current ]]; then
+      mem=$(cat /sys/fs/cgroup/memory.current)
+      mem_mb=$(awk "BEGIN {printf \"%.2f\", $mem/1024/1024}")
+      echo "[$ts] RAM usage: ${mem_mb} MB"
+    elif [[ -r /sys/fs/cgroup/memory/memory.usage_in_bytes ]]; then
+      mem=$(cat /sys/fs/cgroup/memory/memory.usage_in_bytes)
+      mem_mb=$(awk "BEGIN {printf \"%.2f\", $mem/1024/1024}")
+      echo "[$ts] RAM usage: ${mem_mb} MB"
+    else
+      echo "[$ts] RAM usage: unavailable"
+    fi
     sleep 5
   done
 ) &
 
 LOGGER_PID=$!
 
+cleanup() {
+  kill "$LOGGER_PID" >/dev/null 2>&1 || true
+}
 
-echo "🚀 Running Notebook: 1a"
+trap cleanup EXIT
 
-## braucht peak 7,5gb könnte klappen in 8gb container
-jupyter nbconvert \
-  --to notebook \
-  --inplace \
-  --execute 1a_prepare_osm-network_from_pbf_bundesland.ipynb
+cli_args=(run-pipeline)
 
-echo "✅ Notebook 1a execution finished"
+if [[ "${MAPILLARY_COVERAGE_INCLUDE_PREPARE_TILES:-0}" == "1" ]]; then
+  cli_args+=(--include-prepare-tiles)
+fi
 
+if [[ "${MAPILLARY_COVERAGE_DRY_RUN:-0}" == "1" ]]; then
+  cli_args+=(--dry-run)
+fi
 
-
-echo "🚀 Running Notebook: 1b_get_mapillary_coverage.ipynb"
-
-# hier könntest du später auch config.py generieren od. envs auslesen
-jupyter nbconvert \
-  --to notebook \
-  --inplace \
-  --execute 1b_get_mapillary_coverage.ipynb
-
-echo "✅ Notebook 1b execution finished"
-
-
-echo "🚀 Running Notebook: 2"
-
-jupyter nbconvert \
-  --to notebook \
-  --inplace \
-  --execute 2_create_mapillary_coverage_buffer.ipynb
-
-echo "✅ Notebook 2 execution finished"
-
-
-echo "🚀 Running Notebook: 3"
-
-jupyter nbconvert \
-  --to notebook \
-  --inplace \
-  --execute 3_merge_mp-cov_with_osm_use_case_germany.ipynb
-
-echo "✅ Notebook 3 execution finished"
-
-
-echo "🚀 Running Notebook: 4"
-jupyter nbconvert \
-  --to notebook \
-  --inplace \
-  --execute 4_provide_mp-osm_coverage_csv_new.ipynb
-
-echo "✅ Notebook 4 execution finished"
-
-
-# Logger stoppen
-kill $LOGGER_PID || true
+"$PYTHON_BIN" -m mapillary_coverage "${cli_args[@]}"
 
 
 echo "done."
