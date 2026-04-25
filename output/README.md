@@ -6,7 +6,7 @@ This folder contains the **latest** output file for *Mapillary coverage per OSM 
 |----------|-------|
 | **Data created** | 2026-03-31 |
 | **OSM data** | 2026-03-29 |
-| **Mapillary data** | 2023-01-01 → 2026-03-30 |
+| **Mapillary data** | 2023-09-30 → 2026-03-30 |
 | **Buffer distance** | 10 meters |
 | **Coverage ratio threshold** | 0.6 (60%) |
 
