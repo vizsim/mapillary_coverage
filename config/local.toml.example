@@ -2,7 +2,8 @@
 # This file is gitignored via config/local.toml, so secrets stay local.
 
 [mapillary]
-access_token = "MLY|XYXYXYXYXYX"
+# Set this locally after copying to config/local.toml.
+access_token = ""
 
 [geofabrik]
 # bundeslaender = ["DE-BE"]

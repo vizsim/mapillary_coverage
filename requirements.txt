@@ -61,4 +61,3 @@ urllib3==2.5.0
 vt2geojson==0.2.1
 wcwidth==0.2.13
 wheel==0.45.1
-nbconvert

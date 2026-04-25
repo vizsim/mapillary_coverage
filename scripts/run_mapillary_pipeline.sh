@@ -19,13 +19,11 @@ else
   exit 127
 fi
 
-# tqdm in Docker-Run deaktivieren, damit die Logs nicht zugespammt werden
 export TQDM_DISABLE=1
 
 echo "🚀 Starting"
 echo
 
-# Hintergrundprozess: RAM alle 5 Sekunden loggen
 (
   while true; do
     ts=$(date +"%H:%M:%S")
@@ -54,15 +52,10 @@ trap cleanup EXIT
 
 cli_args=(run-pipeline)
 
-if [[ "${MAPILLARY_COVERAGE_INCLUDE_PREPARE_TILES:-0}" == "1" ]]; then
-  cli_args+=(--include-prepare-tiles)
-fi
-
 if [[ "${MAPILLARY_COVERAGE_DRY_RUN:-0}" == "1" ]]; then
   cli_args+=(--dry-run)
 fi
 
 "$PYTHON_BIN" -m mapillary_coverage "${cli_args[@]}"
-
 
 echo "done."

@@ -43,16 +43,11 @@ if [ ! -f "$README_PATH" ]; then
 fi
 
 # ---------------------------
-# ➕ Dateien zum Commit hinzufügen (Outputs, Notebooks, Metadata)
+# ➕ Dateien zum Commit hinzufügen (Outputs und Metadata)
 # ---------------------------
 echo "➕ Füge Dateien zum Commit hinzu..."
 git add -f "$CSV_PATH"
 git add -f "$README_PATH"
-git add -f 1a_prepare_osm-network_from_pbf_bundesland.ipynb
-git add -f 1b_get_mapillary_coverage.ipynb
-git add -f 2_create_mapillary_coverage_buffer.ipynb
-git add -f 3_merge_mp-cov_with_osm_use_case_germany.ipynb
-git add -f 4_provide_mp-osm_coverage_csv_new.ipynb
 git add -f output/ml_metadata.json
 git add -f output/osm_metadata.json
 
@@ -60,14 +55,14 @@ git add -f output/osm_metadata.json
 # 🧹 Prüfen, ob es Änderungen gibt
 # ---------------------------
 if git diff --cached --quiet; then
-  echo "ℹ️ Keine Änderungen an Outputs, Notebooks oder Metadata — nichts zu committen."
+  echo "ℹ️ Keine Änderungen an Outputs oder Metadata — nichts zu committen."
   exit 0
 fi
 
 # ---------------------------
 # ✍️ Commit erstellen
 # ---------------------------
-COMMIT_MSG="Auto-update: outputs, notebooks, metadata ($(date -Iseconds))"
+COMMIT_MSG="Auto-update: outputs and metadata ($(date -Iseconds))"
 
 echo "✍️ Committe Änderungen: $COMMIT_MSG"
 git commit -m "$COMMIT_MSG"
