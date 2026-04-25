@@ -68,11 +68,20 @@ class TilesSettings:
 
 
 @dataclass(frozen=True)
+class ReferenceSettings:
+    bundeslaender_geojson: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"bundeslaender_geojson": self.bundeslaender_geojson}
+
+
+@dataclass(frozen=True)
 class Settings:
     geofabrik: GeofabrikSettings
     processing: ProcessingSettings
     mapillary: MapillarySettings
     tiles: TilesSettings
+    reference: ReferenceSettings
     project_root: Path
     config_dir: Path
 
@@ -82,6 +91,7 @@ class Settings:
             "processing": self.processing.to_dict(),
             "mapillary": self.mapillary.to_dict(),
             "tiles": self.tiles.to_dict(),
+            "reference": self.reference.to_dict(),
             "project_root": str(self.project_root),
             "config_dir": str(self.config_dir),
         }
@@ -101,6 +111,10 @@ class Settings:
     @property
     def legacy_tiles_config(self) -> dict[str, Any]:
         return self.tiles.to_dict()
+
+    @property
+    def legacy_reference_config(self) -> dict[str, Any]:
+        return self.reference.to_dict()
 
 
 def _project_root_from_here() -> Path:
@@ -151,6 +165,7 @@ def _build_settings(data: dict[str, Any], project_root: Path, config_dir: Path) 
     processing_data = data.get("processing", {})
     mapillary_data = data.get("mapillary", {})
     tiles_data = data.get("tiles", {})
+    reference_data = data.get("reference", {})
 
     return Settings(
         geofabrik=GeofabrikSettings(
@@ -172,6 +187,9 @@ def _build_settings(data: dict[str, Any], project_root: Path, config_dir: Path) 
         ),
         tiles=TilesSettings(
             cache_folder=str(tiles_data["cache_folder"]),
+        ),
+        reference=ReferenceSettings(
+            bundeslaender_geojson=str(reference_data["bundeslaender_geojson"]),
         ),
         project_root=project_root,
         config_dir=config_dir,

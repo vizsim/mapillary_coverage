@@ -39,12 +39,14 @@ def _resolve_configs(
     processing_config: dict[str, Any] | None = None,
     mapillary_config: dict[str, Any] | None = None,
     tiles_config: dict[str, Any] | None = None,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    reference_config: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     settings = get_settings()
     return (
         processing_config or settings.legacy_processing_config,
         mapillary_config or settings.legacy_mapillary_config,
         tiles_config or settings.legacy_tiles_config,
+        reference_config or settings.legacy_reference_config,
     )
 
 
@@ -420,7 +422,8 @@ def run_mapillary_download_pipeline(
     mapillary_config: dict[str, Any] | None = None,
     tiles_config: dict[str, Any] | None = None,
     selected_bundeslaender: list[str] | tuple[str, ...] | None = None,
-    bundesland_cache_path: str = os.path.join("prep", "bundeslaender.geojson"),
+    reference_config: dict[str, Any] | None = None,
+    bundesland_cache_path: str | None = None,
     output_folder: str | None = None,
     metadata_output_folder: str | None = None,
     tile_cache_folder: str | None = None,
@@ -430,10 +433,11 @@ def run_mapillary_download_pipeline(
     tqdm_enabled: bool | None = None,
     emit: MessageEmitter | None = print,
 ) -> dict[str, Any]:
-    resolved_processing, resolved_mapillary, resolved_tiles = _resolve_configs(
+    resolved_processing, resolved_mapillary, resolved_tiles, resolved_reference = _resolve_configs(
         processing_config=processing_config,
         mapillary_config=mapillary_config,
         tiles_config=tiles_config,
+        reference_config=reference_config,
     )
     if not str(resolved_mapillary.get("access_token", "")).strip():
         raise ValueError(
@@ -443,12 +447,13 @@ def run_mapillary_download_pipeline(
     effective_output_folder = output_folder or resolved_processing["ml_output_folder"]
     effective_metadata_output_folder = metadata_output_folder or resolved_processing["output_folder"]
     effective_tile_cache_folder = tile_cache_folder or resolved_tiles["cache_folder"]
+    effective_bundesland_cache_path = bundesland_cache_path or resolved_reference["bundeslaender_geojson"]
     tqdm_is_enabled = _tqdm_enabled_from_env() if tqdm_enabled is None else tqdm_enabled
 
-    if not os.path.exists(bundesland_cache_path):
-        raise FileNotFoundError(f"Bundesland-GeoJSON fehlt: {bundesland_cache_path}")
+    if not os.path.exists(effective_bundesland_cache_path):
+        raise FileNotFoundError(f"Bundesland-GeoJSON fehlt: {effective_bundesland_cache_path}")
 
-    bland = gpd.read_file(bundesland_cache_path)
+    bland = gpd.read_file(effective_bundesland_cache_path)
     if selected_bundeslaender:
         bland_filtered = bland[bland["id"].isin(selected_bundeslaender)]
     else:
@@ -503,13 +508,14 @@ def run_mapillary_download_pipeline(
             "output_folder": effective_output_folder,
             "metadata_output_folder": effective_metadata_output_folder,
             "tile_cache_folder": effective_tile_cache_folder,
+            "bundesland_cache_path": effective_bundesland_cache_path,
             "limit_tiles": limit_tiles,
         }
 
     logger, log_file = build_mapillary_logger(effective_output_folder)
     logger.info("=== Mapillary Coverage Download gestartet ===")
     logger.info(f"Log-Datei: {log_file}")
-    logger.info(f"📂 Lade Bundesländer aus: {bundesland_cache_path}")
+    logger.info(f"📂 Lade Bundesländer aus: {effective_bundesland_cache_path}")
     if selected_bundeslaender:
         logger.info(f"🎯 Verarbeite {len(bland_filtered)} ausgewählte Bundesländer: {', '.join(selected_bundeslaender)}")
     else:
