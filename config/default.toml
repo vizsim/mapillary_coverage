@@ -1,0 +1,18 @@
+[mapillary]
+access_token = ""
+
+[geofabrik]
+download_folder = "osm_geofabrik_pbf"
+processed_folder = "processed_osm_files"
+
+[processing]
+freshness_timezone = "Europe/Berlin"
+freshness_lookback_months = 30
+buffer_distance = 10
+mp_coverage_ratio_threshold = 0.6
+max_file_age_days = 4
+output_folder = "output"
+ml_output_folder = "ml_output"
+
+[tiles]
+cache_folder = "prep/tile_cache"

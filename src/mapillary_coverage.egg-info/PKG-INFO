@@ -1,0 +1,91 @@
+Metadata-Version: 2.4
+Name: mapillary-coverage
+Version: 0.1.0
+Summary: CLI and settings scaffold for the Mapillary coverage pipeline
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: asttokens==3.0.0
+Requires-Dist: certifi==2025.8.3
+Requires-Dist: charset-normalizer==3.4.2
+Requires-Dist: click==8.2.1
+Requires-Dist: comm==0.2.3
+Requires-Dist: contourpy==1.3.3
+Requires-Dist: cramjam==2.11.0
+Requires-Dist: cycler==0.12.1
+Requires-Dist: debugpy==1.8.15
+Requires-Dist: decorator==5.2.1
+Requires-Dist: executing==2.2.0
+Requires-Dist: fastparquet==2024.11.0
+Requires-Dist: fonttools==4.59.0
+Requires-Dist: fsspec==2025.7.0
+Requires-Dist: geopandas==1.1.1
+Requires-Dist: idna==3.10
+Requires-Dist: ipykernel==6.30.0
+Requires-Dist: ipython==9.4.0
+Requires-Dist: ipython_pygments_lexers==1.1.1
+Requires-Dist: jedi==0.19.2
+Requires-Dist: jupyter_client==8.6.3
+Requires-Dist: jupyter_core==5.8.1
+Requires-Dist: kiwisolver==1.4.8
+Requires-Dist: mapbox-vector-tile==2.2.0
+Requires-Dist: matplotlib==3.10.5
+Requires-Dist: matplotlib-inline==0.1.7
+Requires-Dist: mercantile==1.2.1
+Requires-Dist: nest-asyncio==1.6.0
+Requires-Dist: numpy==2.3.2
+Requires-Dist: osmium==4.2.0
+Requires-Dist: packaging==25.0
+Requires-Dist: pandas==2.3.1
+Requires-Dist: parso==0.8.4
+Requires-Dist: pexpect==4.9.0
+Requires-Dist: pillow==11.3.0
+Requires-Dist: platformdirs==4.3.8
+Requires-Dist: prompt_toolkit==3.0.51
+Requires-Dist: protobuf==6.31.1
+Requires-Dist: psutil==7.0.0
+Requires-Dist: ptyprocess==0.7.0
+Requires-Dist: pure_eval==0.2.3
+Requires-Dist: pyarrow==21.0.0
+Requires-Dist: pyclipper==1.3.0.post6
+Requires-Dist: Pygments==2.19.2
+Requires-Dist: pyogrio==0.11.1
+Requires-Dist: pyparsing==3.2.3
+Requires-Dist: pyproj==3.7.1
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: pytz==2025.2
+Requires-Dist: pyzmq==27.0.1
+Requires-Dist: requests==2.32.4
+Requires-Dist: setuptools==80.9.0
+Requires-Dist: shapely==2.1.1
+Requires-Dist: six==1.17.0
+Requires-Dist: stack-data==0.6.3
+Requires-Dist: tornado==6.5.1
+Requires-Dist: tqdm==4.67.1
+Requires-Dist: traitlets==5.14.3
+Requires-Dist: tzdata==2025.2
+Requires-Dist: urllib3==2.5.0
+Requires-Dist: vt2geojson==0.2.1
+Requires-Dist: wcwidth==0.2.13
+Requires-Dist: wheel==0.45.1
+Requires-Dist: nbconvert
+Dynamic: license-file
+
+# Mapillary Coverage
+
+A set of Jupyter notebooks that return data on which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
+For detailed information on Mapillary coverage tiles, refer to the [official Mapillary API documentation](https://www.mapillary.com/developer/api-documentation?locale=de_DE#coverage-tiles-computed).
+
+## Process
+
+The process downloads Mapillary sequence coverage tiles for Germany at zoom level 14. These tiles contain lines representing sequences. The sequences are filtered by date, keeping only those captured on or after a **rolling cutoff**: Berlin local midnight of the processing day minus **30 months** (2.5 years). A buffer of 10 meters is then created around the sequence lines, and the percentage of coverage per road is calculated. The output file includes only `osm_id`s with at least 60% coverage.
+
+This process is not perfect but represents a good compromise in terms of data source, processing time, and the meaningfulness of the results.
+
+## Result
+
+The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
+
+## License
+
+See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
