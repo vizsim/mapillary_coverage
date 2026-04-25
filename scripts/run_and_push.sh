@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="/home/simon/mapillary_coverage"
-BRANCH="feature/docker-notebook"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BRANCH="to-cli"
 CSV_PATH="output/germany_osm-highways_mp-coverage_latest.csv"  # HIER anpassen!
 README_PATH="output/README.md"
 
