@@ -24,6 +24,19 @@ The config surface is now:
 - `config/local.toml`: optional local overrides, ignored by git
 - `config/local.toml.example`: copy template for local overrides
 
+## Setup
+
+The repository uses `uv` as the single dependency and environment manager.
+
+Local setup:
+
+```bash
+uv sync
+source .venv/bin/activate
+```
+
+`uv.lock` is checked in and should be kept in sync with `pyproject.toml`.
+
 ## Process
 
 The process downloads Mapillary sequence coverage tiles for Germany at zoom level 14. These tiles contain lines representing sequences. The sequences are filtered by date, keeping only those captured on or after a **rolling cutoff**: Berlin local midnight of the processing day minus **30 months** (2.5 years). A buffer of 10 meters is then created around the sequence lines, and the percentage of coverage per road is calculated. The output file includes only `osm_id`s with at least 60% coverage.
@@ -32,7 +45,7 @@ This process is not perfect but represents a good compromise in terms of data so
 
 ## CLI Workflow
 
-After creating or activating the virtual environment, the package can be executed through `python -m mapillary_coverage ...` or the console script `mapillary-coverage ...`.
+After `uv sync`, the package can be executed through `uv run mapillary-coverage ...`, `python -m mapillary_coverage ...`, or the console script `mapillary-coverage ...` from the synced `.venv`.
 
 Useful commands:
 

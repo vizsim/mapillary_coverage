@@ -23,10 +23,10 @@ Requires-Dist: geopandas==1.1.1
 Requires-Dist: idna==3.10
 Requires-Dist: ipykernel==6.30.0
 Requires-Dist: ipython==9.4.0
-Requires-Dist: ipython_pygments_lexers==1.1.1
+Requires-Dist: ipython-pygments-lexers==1.1.1
 Requires-Dist: jedi==0.19.2
-Requires-Dist: jupyter_client==8.6.3
-Requires-Dist: jupyter_core==5.8.1
+Requires-Dist: jupyter-client==8.6.3
+Requires-Dist: jupyter-core==5.8.1
 Requires-Dist: kiwisolver==1.4.8
 Requires-Dist: mapbox-vector-tile==2.2.0
 Requires-Dist: matplotlib==3.10.5
@@ -41,14 +41,14 @@ Requires-Dist: parso==0.8.4
 Requires-Dist: pexpect==4.9.0
 Requires-Dist: pillow==11.3.0
 Requires-Dist: platformdirs==4.3.8
-Requires-Dist: prompt_toolkit==3.0.51
+Requires-Dist: prompt-toolkit==3.0.51
 Requires-Dist: protobuf==6.31.1
 Requires-Dist: psutil==7.0.0
 Requires-Dist: ptyprocess==0.7.0
-Requires-Dist: pure_eval==0.2.3
+Requires-Dist: pure-eval==0.2.3
 Requires-Dist: pyarrow==21.0.0
 Requires-Dist: pyclipper==1.3.0.post6
-Requires-Dist: Pygments==2.19.2
+Requires-Dist: pygments==2.19.2
 Requires-Dist: pyogrio==0.11.1
 Requires-Dist: pyparsing==3.2.3
 Requires-Dist: pyproj==3.7.1
@@ -68,19 +68,90 @@ Requires-Dist: urllib3==2.5.0
 Requires-Dist: vt2geojson==0.2.1
 Requires-Dist: wcwidth==0.2.13
 Requires-Dist: wheel==0.45.1
-Requires-Dist: nbconvert
 Dynamic: license-file
 
 # Mapillary Coverage
 
-A set of Jupyter notebooks that return data on which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
+A pipeline for determining which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
 For detailed information on Mapillary coverage tiles, refer to the [official Mapillary API documentation](https://www.mapillary.com/developer/api-documentation?locale=de_DE#coverage-tiles-computed).
+
+The production workflow is CLI-only.
+
+## Secrets
+
+Do not commit the Mapillary API token into the repository.
+
+Use one of these two paths instead:
+
+- Set `MAPILLARY_ACCESS_TOKEN` in the shell or server environment.
+- Copy `config/local.toml.example` to `config/local.toml` and set the token there. `config/local.toml` is ignored by git.
+
+If no token is configured, the Mapillary download step fails fast with a clear error message.
+
+## Configuration
+
+The config surface is now:
+
+- `config/default.toml`: tracked project defaults
+- `config/local.toml`: optional local overrides, ignored by git
+- `config/local.toml.example`: copy template for local overrides
+
+## Setup
+
+The repository uses `uv` as the single dependency and environment manager.
+
+Local setup:
+
+```bash
+uv sync
+source .venv/bin/activate
+```
+
+`uv.lock` is checked in and should be kept in sync with `pyproject.toml`.
 
 ## Process
 
 The process downloads Mapillary sequence coverage tiles for Germany at zoom level 14. These tiles contain lines representing sequences. The sequences are filtered by date, keeping only those captured on or after a **rolling cutoff**: Berlin local midnight of the processing day minus **30 months** (2.5 years). A buffer of 10 meters is then created around the sequence lines, and the percentage of coverage per road is calculated. The output file includes only `osm_id`s with at least 60% coverage.
 
 This process is not perfect but represents a good compromise in terms of data source, processing time, and the meaningfulness of the results.
+
+## CLI Workflow
+
+After `uv sync`, the package can be executed through `uv run mapillary-coverage ...`, `python -m mapillary_coverage ...`, or the console script `mapillary-coverage ...` from the synced `.venv`.
+
+Useful commands:
+
+- `mapillary-coverage show-config`
+- `mapillary-coverage run-pipeline --dry-run`
+- `mapillary-coverage prepare-osm --dry-run --no-network --bundeslaender DE-HH`
+- `mapillary-coverage download-mapillary --dry-run --bundeslaender DE-HH`
+- `mapillary-coverage create-buffer --dry-run --bundeslaender DE-HH`
+- `mapillary-coverage merge-coverage --dry-run --bundeslaender DE-HH`
+- `mapillary-coverage export-csv --dry-run --bundeslaender DE-HH`
+
+The production shell entrypoint is [scripts/run_mapillary_pipeline.sh](/home/simon/mapillary_coverage/scripts/run_mapillary_pipeline.sh).
+
+## Targeted Validation
+
+Long-running steps can be validated on a smaller slice before starting a full Germany run.
+
+Example: real Hamburg-only Mapillary download test with a tile limit and temporary output folders:
+
+```bash
+OUT_DIR="$(mktemp -d /tmp/mapillary-hh-out-XXXXXX)"
+META_DIR="$(mktemp -d /tmp/mapillary-hh-meta-XXXXXX)"
+TQDM_DISABLE=1 mapillary-coverage download-mapillary \
+  --bundeslaender DE-HH \
+  --limit-tiles 20 \
+  --output-folder "$OUT_DIR" \
+  --metadata-output-folder "$META_DIR"
+```
+
+This exercises the real download path without overwriting the normal repository outputs.
+
+## Interrupted Runs
+
+If a terminal shows `exit code: 130`, that means the process was interrupted, usually via `Ctrl+C`. It does not by itself indicate a code defect.
 
 ## Result
 
