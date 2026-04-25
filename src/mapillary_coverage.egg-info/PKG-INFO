@@ -5,166 +5,106 @@ Summary: CLI and settings scaffold for the Mapillary coverage pipeline
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: asttokens==3.0.0
-Requires-Dist: certifi==2025.8.3
-Requires-Dist: charset-normalizer==3.4.2
-Requires-Dist: click==8.2.1
-Requires-Dist: comm==0.2.3
-Requires-Dist: contourpy==1.3.3
-Requires-Dist: cramjam==2.11.0
-Requires-Dist: cycler==0.12.1
-Requires-Dist: debugpy==1.8.15
-Requires-Dist: decorator==5.2.1
-Requires-Dist: executing==2.2.0
-Requires-Dist: fastparquet==2024.11.0
-Requires-Dist: fonttools==4.59.0
-Requires-Dist: fsspec==2025.7.0
 Requires-Dist: geopandas==1.1.1
-Requires-Dist: idna==3.10
-Requires-Dist: ipykernel==6.30.0
-Requires-Dist: ipython==9.4.0
-Requires-Dist: ipython-pygments-lexers==1.1.1
-Requires-Dist: jedi==0.19.2
-Requires-Dist: jupyter-client==8.6.3
-Requires-Dist: jupyter-core==5.8.1
-Requires-Dist: kiwisolver==1.4.8
-Requires-Dist: mapbox-vector-tile==2.2.0
-Requires-Dist: matplotlib==3.10.5
-Requires-Dist: matplotlib-inline==0.1.7
 Requires-Dist: mercantile==1.2.1
-Requires-Dist: nest-asyncio==1.6.0
-Requires-Dist: numpy==2.3.2
 Requires-Dist: osmium==4.2.0
-Requires-Dist: packaging==25.0
 Requires-Dist: pandas==2.3.1
-Requires-Dist: parso==0.8.4
-Requires-Dist: pexpect==4.9.0
-Requires-Dist: pillow==11.3.0
-Requires-Dist: platformdirs==4.3.8
-Requires-Dist: prompt-toolkit==3.0.51
-Requires-Dist: protobuf==6.31.1
-Requires-Dist: psutil==7.0.0
-Requires-Dist: ptyprocess==0.7.0
-Requires-Dist: pure-eval==0.2.3
 Requires-Dist: pyarrow==21.0.0
-Requires-Dist: pyclipper==1.3.0.post6
-Requires-Dist: pygments==2.19.2
 Requires-Dist: pyogrio==0.11.1
-Requires-Dist: pyparsing==3.2.3
-Requires-Dist: pyproj==3.7.1
 Requires-Dist: python-dateutil==2.9.0.post0
-Requires-Dist: pytz==2025.2
-Requires-Dist: pyzmq==27.0.1
 Requires-Dist: requests==2.32.4
-Requires-Dist: setuptools==80.9.0
 Requires-Dist: shapely==2.1.1
-Requires-Dist: six==1.17.0
-Requires-Dist: stack-data==0.6.3
-Requires-Dist: tornado==6.5.1
 Requires-Dist: tqdm==4.67.1
-Requires-Dist: traitlets==5.14.3
 Requires-Dist: tzdata==2025.2
 Requires-Dist: urllib3==2.5.0
 Requires-Dist: vt2geojson==0.2.1
-Requires-Dist: wcwidth==0.2.13
-Requires-Dist: wheel==0.45.1
 Dynamic: license-file
 
 # Mapillary Coverage
 
-A pipeline for determining which streets (`osm_id`s) have `mapillary_coverage`, either `pano` for 360° imagery or `regular` for standard imagery.
-For detailed information on Mapillary coverage tiles, refer to the [official Mapillary API documentation](https://www.mapillary.com/developer/api-documentation?locale=de_DE#coverage-tiles-computed).
-
-The production workflow is CLI-only.
-
-## Secrets
-
-Do not commit the Mapillary API token into the repository.
-
-Use one of these two paths instead:
-
-- Set `MAPILLARY_ACCESS_TOKEN` in the shell or server environment.
-- Copy `config/local.toml.example` to `config/local.toml` and set the token there. `config/local.toml` is ignored by git.
-
-If no token is configured, the Mapillary download step fails fast with a clear error message.
-
-## Configuration
-
-The config surface is now:
-
-- `config/default.toml`: tracked project defaults
-- `config/local.toml`: optional local overrides, ignored by git
-- `config/local.toml.example`: copy template for local overrides
-
-Default internal paths are now grouped more clearly:
-
-- `resources/bundeslaender.geojson`: checked-in reference geometry
-- `data/cache/tile_cache`: checked-in tile cache JSONs
-- `data/osm/raw`: downloaded Geofabrik PBFs
-- `data/osm/processed`: processed OSM highway PBFs
-- `data/mapillary/coverage`: intermediate Mapillary artifacts and logs
-- `output`: final externally consumed deliverables
+A CLI-only pipeline that computes Mapillary coverage for OSM highways in Germany.
 
 ## Setup
 
-The repository uses `uv` as the single dependency and environment manager.
+Prerequisites:
 
-Local setup:
+- `uv` and Python 3.12 for local runs
+- Docker with `docker compose` for container runs
+- a Mapillary token via `config/local.toml` or `MAPILLARY_ACCESS_TOKEN`
+
+Local bootstrap:
 
 ```bash
 uv sync
 source .venv/bin/activate
+cp config/local.toml.example config/local.toml
 ```
 
-`uv.lock` is checked in and should be kept in sync with `pyproject.toml`.
+Important paths:
 
-## Process
+- `config/default.toml`: tracked defaults
+- `config/local.toml`: local overrides and secrets
+- `resources/bundeslaender.geojson`: reference geometry
+- `data/cache/tile_cache`: checked-in tile cache
+- `data/osm/raw`, `data/osm/processed`, `data/mapillary/coverage`: internal pipeline data
+- `output`: final CSV and metadata
 
-The process downloads Mapillary sequence coverage tiles for Germany at zoom level 14. These tiles contain lines representing sequences. The sequences are filtered by date, keeping only those captured on or after a **rolling cutoff**: Berlin local midnight of the processing day minus **30 months** (2.5 years). A buffer of 10 meters is then created around the sequence lines, and the percentage of coverage per road is calculated. The output file includes only `osm_id`s with at least 60% coverage.
+## CLI
 
-This process is not perfect but represents a good compromise in terms of data source, processing time, and the meaningfulness of the results.
-
-## CLI Workflow
-
-After `uv sync`, the package can be executed through `uv run mapillary-coverage ...`, `python -m mapillary_coverage ...`, or the console script `mapillary-coverage ...` from the synced `.venv`.
-
-Useful commands:
-
-- `mapillary-coverage show-config`
-- `mapillary-coverage run-pipeline --dry-run`
-- `mapillary-coverage prepare-osm --dry-run --no-network --bundeslaender DE-HH`
-- `mapillary-coverage download-mapillary --dry-run --bundeslaender DE-HH`
-- `mapillary-coverage create-buffer --dry-run --bundeslaender DE-HH`
-- `mapillary-coverage merge-coverage --dry-run --bundeslaender DE-HH`
-- `mapillary-coverage export-csv --dry-run --bundeslaender DE-HH`
+```bash
+uv run mapillary-coverage show-config
+uv run mapillary-coverage run-pipeline --dry-run
+uv run mapillary-coverage run-pipeline
+```
 
 The production shell entrypoint is [scripts/run_mapillary_pipeline.sh](/home/simon/mapillary_coverage/scripts/run_mapillary_pipeline.sh).
 
-## Targeted Validation
+## Docker
 
-Long-running steps can be validated on a smaller slice before starting a full Germany run.
-
-Example: real Hamburg-only Mapillary download test with a tile limit and temporary output folders:
+Without VPN:
 
 ```bash
-OUT_DIR="$(mktemp -d /tmp/mapillary-hh-out-XXXXXX)"
-META_DIR="$(mktemp -d /tmp/mapillary-hh-meta-XXXXXX)"
-TQDM_DISABLE=1 mapillary-coverage download-mapillary \
-  --bundeslaender DE-HH \
-  --limit-tiles 20 \
-  --output-folder "$OUT_DIR" \
-  --metadata-output-folder "$META_DIR"
+docker compose -f docker/docker-compose.yml up --build mapillary_worker
 ```
 
-This exercises the real download path without overwriting the normal repository outputs.
+With VPN via Gluetun:
 
-## Interrupted Runs
+```bash
+export NORD_USER="..."
+export NORD_PASS="..."
 
-If a terminal shows `exit code: 130`, that means the process was interrupted, usually via `Ctrl+C`. It does not by itself indicate a code defect.
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.vpn.yml \
+  up --build mapillary_worker
+```
+
+Stop and clean up:
+
+```bash
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.vpn.yml \
+  down --remove-orphans
+```
+
+## Server Run
+
+Minimum flow:
+
+```bash
+git clone https://github.com/vizsim/mapillary_coverage.git
+cd mapillary_coverage
+cp config/local.toml.example config/local.toml
+
+docker compose -f docker/docker-compose.yml up --build mapillary_worker
+```
+
+For a one-command update, run, and push workflow, use [scripts/run_and_push.sh](/home/simon/mapillary_coverage/scripts/run_and_push.sh).
 
 ## Result
 
-The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
+The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds the latest CSV and metadata files.
 
 ## License
 
