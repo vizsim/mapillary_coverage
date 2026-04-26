@@ -1,4 +1,4 @@
-version: "3.9"
+#version: "3.9"
 
 services:
   mapillary_worker:
@@ -9,7 +9,11 @@ services:
     working_dir: /app
     # Repo vom Host in den Container mounten (optional, aber praktisch beim Entwickeln)
     volumes:
-      - ..:/app
+      - ../output:/app/output
+      - ../data/osm:/app/data/osm
+      - ../data/mapillary:/app/data/mapillary
+#    volumes:
+#      - ..:/app
 #    dns:
 #      - 1.1.1.1
 #      - 8.8.8.8
