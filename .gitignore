@@ -32,3 +32,5 @@ config/local.toml
 !resources/bundeslaender.geojson
 
 !*_metadata.json
+
+!output/germany_osm-highways_mp-coverage_latest.csv
