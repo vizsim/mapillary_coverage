@@ -18,6 +18,8 @@ The config surface is now:
 - `config/default.toml`: tracked project defaults
 - `config/local.toml`: optional local overrides, ignored by git
 - `config/local.toml.example`: copy template for local overrides
+- `docker/.env`: optional VPN credentials for the Gluetun sidecar
+- `docker/.env.example`: example for the VPN environment file
 
 Default internal paths are now grouped more clearly:
 
@@ -27,6 +29,20 @@ Default internal paths are now grouped more clearly:
 - `data/osm/processed`: processed OSM highway PBFs
 - `data/mapillary/coverage`: intermediate Mapillary artifacts and logs
 - `output`: final externally consumed deliverables
+
+## Local Setup
+
+```bash
+uv sync
+cp config/local.toml.example config/local.toml
+```
+
+Set the Mapillary token in `config/local.toml`:
+
+```toml
+[mapillary]
+access_token = "..."
+```
 
 ## CLI Workflow
 
@@ -43,6 +59,49 @@ Useful commands:
 - `mapillary-coverage export-csv --dry-run --bundeslaender DE-HH`
 
 The production shell entrypoint is **scripts/run_mapillary_pipeline.sh**
+
+## Docker / Server Run
+
+Validated server setup uses Docker Compose v2 plus the checked-out repository state on disk.
+
+First-time server preparation:
+
+```bash
+cp config/local.toml.example config/local.toml
+cp docker/.env.example docker/.env
+mkdir -p output data/osm/raw data/osm/processed data/mapillary/coverage
+```
+
+Set the Mapillary token in `config/local.toml` and, when using VPN, set `NORD_USER` and `NORD_PASS` in `docker/.env`.
+
+Check Compose v2:
+
+```bash
+docker compose version
+```
+
+Start the full pipeline with VPN:
+
+```bash
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.vpn.yml up --build mapillary_worker
+```
+
+Stop and clean up:
+
+```bash
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans
+```
+
+For a smaller validation run, temporarily set a subset in `config/local.toml`, for example:
+
+```toml
+[geofabrik]
+bundeslaender = ["DE-HB"]
+```
+
+Remove the override again before a full Germany run.
 
 ## Result
 

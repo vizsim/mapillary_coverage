@@ -2,12 +2,22 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-BRANCH="to-cli"
+REPO_DIR="${REPO_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 CSV_PATH="output/germany_osm-highways_mp-coverage_latest.csv"  # HIER anpassen!
 README_PATH="output/README.md"
 
 cd "$REPO_DIR"
+
+BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE=(docker-compose)
+else
+  echo "❌ Weder 'docker compose' noch 'docker-compose' gefunden."
+  exit 127
+fi
 
 echo "🔄 Git: Hole neuesten Stand auf Branch $BRANCH..."
 git checkout "$BRANCH"
@@ -17,13 +27,22 @@ echo "🐳 Starte Docker-Pipeline (mit VPN)..."
 cd docker
 
 # 1) Existierende Container sauber runterfahren
-docker-compose -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
+"${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
 
-# 2) Worker im VPN laufen lassen (blockierend, bis fertig)
-docker-compose -f docker-compose.yml -f docker-compose.vpn.yml up --build mapillary_worker
+# 2) Worker im VPN laufen lassen und den echten Worker-Exitcode übernehmen
+set +e
+"${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml \
+  up --build --abort-on-container-exit --exit-code-from mapillary_worker mapillary_worker
+compose_status=$?
+set -e
 
 # Optional: danach alles wieder aufräumen
-docker-compose -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans
+"${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
+
+if [[ "$compose_status" -ne 0 ]]; then
+  echo "❌ Docker-Pipeline fehlgeschlagen (Exitcode: $compose_status)"
+  exit "$compose_status"
+fi
 
 cd ..
 

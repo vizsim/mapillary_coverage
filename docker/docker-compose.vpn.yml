@@ -1,9 +1,6 @@
-#version: "3.9"
-
 services:
   gluetun:
     image: qmcgaw/gluetun
-    container_name: gluetun
     cap_add:
       - NET_ADMIN
     devices:
@@ -18,7 +15,6 @@ services:
     restart: unless-stopped
 
   mapillary_worker:
-    # hier überschreiben/erweitern wir nur Netzwerk-bezogene Sachen
     network_mode: "service:gluetun"
     depends_on:
       - gluetun
