@@ -29,14 +29,21 @@ cd docker
 # 1) Existierende Container sauber runterfahren
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
 
-# 2) Worker im VPN laufen lassen und den echten Worker-Exitcode übernehmen
+# 2) Gluetun separat starten und kurz hochkommen lassen
+echo "🛡️ Starte Gluetun..."
+"${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml up -d gluetun
+
+echo "⏳ Warte 40 Sekunden auf VPN-Initialisierung..."
+sleep 40
+
+# 3) Worker im bereits laufenden VPN starten und echten Worker-Exitcode übernehmen
 set +e
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml \
-  up --build --abort-on-container-exit --exit-code-from mapillary_worker mapillary_worker
+  up --build --no-deps --abort-on-container-exit --exit-code-from mapillary_worker mapillary_worker
 compose_status=$?
 set -e
 
-# Optional: danach alles wieder aufräumen
+# 4) Danach alles wieder aufräumen
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
 
 if [[ "$compose_status" -ne 0 ]]; then
