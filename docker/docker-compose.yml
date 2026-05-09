@@ -1,22 +1,12 @@
-#version: "3.9"
-
 services:
   mapillary_worker:
     build:
       context: ..
       dockerfile: docker/Dockerfile.worker
-    container_name: mapillary_worker
     working_dir: /app
-    # Repo vom Host in den Container mounten (optional, aber praktisch beim Entwickeln)
     volumes:
+      - ../config:/app/config:ro
       - ../output:/app/output
       - ../data/osm:/app/data/osm
       - ../data/mapillary:/app/data/mapillary
-#    volumes:
-#      - ..:/app
-#    dns:
-#      - 1.1.1.1
-#      - 8.8.8.8
-    # Wenn du per SSH-Key zu GitHub pushen willst (später möglich):
-    # - ~/.ssh:/root/.ssh:ro
     mem_limit: 6g
