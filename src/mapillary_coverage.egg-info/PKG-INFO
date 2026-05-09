@@ -1,0 +1,111 @@
+Metadata-Version: 2.4
+Name: mapillary-coverage
+Version: 0.1.0
+Summary: CLI and settings scaffold for the Mapillary coverage pipeline
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: geopandas==1.1.1
+Requires-Dist: mercantile==1.2.1
+Requires-Dist: osmium==4.2.0
+Requires-Dist: pandas==2.3.1
+Requires-Dist: pyarrow==21.0.0
+Requires-Dist: pyogrio==0.11.1
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: requests==2.32.4
+Requires-Dist: shapely==2.1.1
+Requires-Dist: tqdm==4.67.1
+Requires-Dist: tzdata==2025.2
+Requires-Dist: urllib3==2.5.0
+Requires-Dist: vt2geojson==0.2.1
+Dynamic: license-file
+
+# Mapillary Coverage
+
+A CLI-only pipeline that computes Mapillary coverage for OSM highways in Germany.
+
+## Setup
+
+Prerequisites:
+
+- `uv` and Python 3.12 for local runs
+- Docker with `docker compose` for container runs
+- a Mapillary token via `config/local.toml` or `MAPILLARY_ACCESS_TOKEN`
+
+Local bootstrap:
+
+```bash
+uv sync
+source .venv/bin/activate
+cp config/local.toml.example config/local.toml
+```
+
+Important paths:
+
+- `config/default.toml`: tracked defaults
+- `config/local.toml`: local overrides and secrets
+- `resources/bundeslaender.geojson`: reference geometry
+- `data/cache/tile_cache`: checked-in tile cache
+- `data/osm/raw`, `data/osm/processed`, `data/mapillary/coverage`: internal pipeline data
+- `output`: final CSV and metadata
+
+## CLI
+
+```bash
+uv run mapillary-coverage show-config
+uv run mapillary-coverage run-pipeline --dry-run
+uv run mapillary-coverage run-pipeline
+```
+
+The production shell entrypoint is [scripts/run_mapillary_pipeline.sh](/home/simon/mapillary_coverage/scripts/run_mapillary_pipeline.sh).
+
+## Docker
+
+Without VPN:
+
+```bash
+docker compose -f docker/docker-compose.yml up --build mapillary_worker
+```
+
+With VPN via Gluetun:
+
+```bash
+export NORD_USER="..."
+export NORD_PASS="..."
+
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.vpn.yml \
+  up --build mapillary_worker
+```
+
+Stop and clean up:
+
+```bash
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.vpn.yml \
+  down --remove-orphans
+```
+
+## Server Run
+
+Minimum flow:
+
+```bash
+git clone https://github.com/vizsim/mapillary_coverage.git
+cd mapillary_coverage
+cp config/local.toml.example config/local.toml
+
+docker compose -f docker/docker-compose.yml up --build mapillary_worker
+```
+
+For a one-command update, run, and push workflow, use [scripts/run_and_push.sh](/home/simon/mapillary_coverage/scripts/run_and_push.sh).
+
+## Result
+
+The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds the latest CSV and metadata files.
+
+## License
+
+See the [LICENSE](LICENSE) file for license rights and limitations (MIT).

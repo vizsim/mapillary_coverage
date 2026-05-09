@@ -1,0 +1,25 @@
+[mapillary]
+# Keep secrets out of tracked files. Set the real token in config/local.toml
+# or via the MAPILLARY_ACCESS_TOKEN environment variable.
+access_token = ""
+
+[geofabrik]
+# Leave bundeslaender unset to process all states.
+download_folder = "data/osm/raw"
+processed_folder = "data/osm/processed"
+
+[processing]
+# Rolling freshness window: Berlin start-of-day minus freshness_lookback_months.
+freshness_timezone = "Europe/Berlin"
+freshness_lookback_months = 30
+buffer_distance = 10
+mp_coverage_ratio_threshold = 0.6
+max_file_age_days = 4
+output_folder = "output"
+ml_output_folder = "data/mapillary/coverage"
+
+[tiles]
+cache_folder = "data/cache/tile_cache"
+
+[reference]
+bundeslaender_geojson = "resources/bundeslaender.geojson"

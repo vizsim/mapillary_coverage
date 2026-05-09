@@ -16,15 +16,21 @@ __pycache__/
 *.pyc
 *.log
 *.ipynb_checkpoints
+ml_output/
+processed_osm_files/
+osm_geofabrik_pbf/
+prep/
 
+.env
+config/local.toml
 
 
 !output/
 #!output/**
 
-!prep/tile_cache/*.json
+!data/cache/tile_cache/*.json
+!resources/bundeslaender.geojson
 
 !*_metadata.json
 
-config.py
-!requirements.txt
+!output/germany_osm-highways_mp-coverage_latest.csv

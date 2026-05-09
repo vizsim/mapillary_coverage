@@ -1,0 +1,18 @@
+# Optional local overrides. Copy to config/local.toml and adjust as needed.
+# This file is gitignored via config/local.toml, so secrets stay local.
+
+[mapillary]
+# Set this locally after copying to config/local.toml.
+access_token = ""
+
+[geofabrik]
+# bundeslaender = ["DE-BE"]
+
+[processing]
+# max_file_age_days = 4
+
+[tiles]
+# cache_folder = "data/cache/tile_cache"
+
+[reference]
+# bundeslaender_geojson = "resources/bundeslaender.geojson"
