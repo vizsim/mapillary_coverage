@@ -1,0 +1,20 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - OPENVPN_USER=${NORD_USER}
+      - OPENVPN_PASSWORD=${NORD_PASS}
+      - SERVER_COUNTRIES=Germany
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+
+  mapillary_worker:
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun

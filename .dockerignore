@@ -1,0 +1,45 @@
+# ignore virtual environments
+.venv/
+env/
+
+# ignore outputs
+*.csv
+*.parquet
+*.pbf
+*.geojson
+*.geojson.gz
+*.feather
+
+# ignore large notebooks with output (optional)
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# ignore Jupyter lab stuff
+.jupyter/
+
+# ignore git
+.git
+.gitignore
+
+.env
+
+# ignore docker files
+# docker/
+
+# ignore data directories, if exist
+output/
+ml_output/
+processed_osm_files/
+osm_geofabrik_pbf/
+prep/
+data/osm/
+data/mapillary/
+data/cache/
+archive/
+
+!data/cache/
+!data/cache/tile_cache/
+!data/cache/tile_cache/*.json
+!resources/bundeslaender.geojson
+
+# ignore everything that shouldn't be in the Docker image
