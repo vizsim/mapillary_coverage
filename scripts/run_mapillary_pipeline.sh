@@ -38,7 +38,7 @@ echo
     else
       echo "[$ts] RAM usage: unavailable"
     fi
-    sleep 5
+    sleep "${RAM_LOG_INTERVAL:-60}"
   done
 ) &
 

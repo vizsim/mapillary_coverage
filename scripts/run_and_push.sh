@@ -8,6 +8,20 @@ README_PATH="output/README.md"
 
 cd "$REPO_DIR"
 
+# ---------------------------
+# 📝 Logging: jeder Lauf in logs/run_<ts>.log, alte Läufe aufräumen
+# ---------------------------
+LOG_DIR="${REPO_DIR}/logs"
+mkdir -p "$LOG_DIR"
+LOG_FILE="${LOG_DIR}/run_$(date +%Y-%m-%d_%H%M%S).log"
+# gesamte Ausgabe (stdout + stderr) zusätzlich ins Logfile spiegeln
+exec > >(tee -a "$LOG_FILE") 2>&1
+# bequemer Zugriff auf den letzten Lauf: logs/latest.log
+ln -sfn "$(basename "$LOG_FILE")" "${LOG_DIR}/latest.log"
+# nur die letzten 20 Läufe behalten
+ls -1t "${LOG_DIR}"/run_*.log 2>/dev/null | tail -n +21 | xargs -r rm -f || true
+echo "📝 Log: $LOG_FILE"
+
 BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
 if ! docker compose version >/dev/null 2>&1; then
