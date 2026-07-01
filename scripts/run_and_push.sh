@@ -10,18 +10,15 @@ cd "$REPO_DIR"
 
 BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
 
-if docker compose version >/dev/null 2>&1; then
-  DOCKER_COMPOSE=(docker compose)
-elif command -v docker-compose >/dev/null 2>&1; then
-  DOCKER_COMPOSE=(docker-compose)
-else
-  echo "❌ Weder 'docker compose' noch 'docker-compose' gefunden."
+if ! docker compose version >/dev/null 2>&1; then
+  echo "❌ 'docker compose' (v2) nicht gefunden — wird benötigt."
   exit 127
 fi
+DOCKER_COMPOSE=(docker compose)
 
 echo "🔄 Git: Hole neuesten Stand auf Branch $BRANCH..."
 git checkout "$BRANCH"
-git pull --rebase origin "$BRANCH"
+git pull --rebase --autostash origin "$BRANCH"
 
 echo "🐳 Starte Docker-Pipeline (mit VPN)..."
 cd docker
