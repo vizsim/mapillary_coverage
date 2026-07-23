@@ -81,6 +81,15 @@ if [ ! -f "$README_PATH" ]; then
 fi
 
 # ---------------------------
+# ☁️ Outputs nach B2 hochladen (öffentliches Archiv → data.vizsim.de/mapillary_coverage)
+# ---------------------------
+# Läuft unabhängig vom git-Commit (auch wenn es keine Diffs gibt). Defensive —
+# fehlt b2-CLI/Creds, wird nur gewarnt und der Lauf NICHT abgebrochen.
+echo "☁️ Lade Outputs nach B2..."
+"${SCRIPT_DIR}/upload_outputs_to_b2.sh" || \
+  echo "⚠️  B2-Upload meldete einen Fehler — Lauf wird trotzdem fortgesetzt."
+
+# ---------------------------
 # ➕ Dateien zum Commit hinzufügen (Outputs und Metadata)
 # ---------------------------
 echo "➕ Füge Dateien zum Commit hinzu..."
