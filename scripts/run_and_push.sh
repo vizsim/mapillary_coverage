@@ -44,8 +44,30 @@ cd docker
 echo "🛡️ Starte Gluetun..."
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml up -d gluetun
 
-echo "⏳ Warte 40 Sekunden auf VPN-Initialisierung..."
-sleep 40
+# Auf den Healthcheck warten statt fest zu schlafen. Steht der Tunnel noch
+# nicht, blockiert gluetun jeden Netzverkehr — der Worker lief dann in
+# DNS-Fehler und drehte stundenlang leer (07.09.2026: 62 h, null Ergebnisse).
+# Kommt der Tunnel nicht hoch, wird abgebrochen statt blind weiterzumachen.
+echo "⏳ Warte auf VPN (Healthcheck, max. ${VPN_WAIT_SECONDS:-300}s)..."
+GLUETUN_CID="$("${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml ps -q gluetun)"
+vpn_ready=0
+for _ in $(seq 1 $(( ${VPN_WAIT_SECONDS:-300} / 5 ))); do
+  if [[ "$(docker inspect -f '{{.State.Health.Status}}' "$GLUETUN_CID" 2>/dev/null)" == "healthy" ]]; then
+    vpn_ready=1
+    break
+  fi
+  sleep 5
+done
+
+if [[ "$vpn_ready" -ne 1 ]]; then
+  echo "❌ VPN wurde nicht healthy — Abbruch (Worker wird nicht gestartet)."
+  docker logs --tail 30 "$GLUETUN_CID" 2>&1 | sed 's/^/   gluetun| /' || true
+  "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
+  exit 1
+fi
+# Exit-IP aus dem gluetun-Log, nicht ueber die Control-API: die verlangt seit
+# gluetun 3.40 einen API-Key, den dieses Setup nicht braucht.
+echo "✅ VPN steht — $(docker logs "$GLUETUN_CID" 2>&1 | grep -a 'Public IP address' | tail -1 | sed 's/.*Public IP address/Exit:/' || echo 'Exit-IP unbekannt')"
 
 # 3) Worker im bereits laufenden VPN starten und echten Worker-Exitcode übernehmen
 set +e
@@ -54,7 +76,11 @@ set +e
 compose_status=$?
 set -e
 
-# 4) Danach alles wieder aufräumen
+# 4) gluetun-Log sichern, BEVOR der Container weg ist. Compose hängt nur an den
+# Worker-Logs; was das VPN getan hat, war hinterher nicht mehr rekonstruierbar.
+docker logs "$GLUETUN_CID" > "${LOG_DIR}/gluetun_latest.log" 2>&1 || true
+
+# 5) Danach alles wieder aufräumen
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
 
 if [[ "$compose_status" -ne 0 ]]; then

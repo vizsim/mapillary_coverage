@@ -1,6 +1,8 @@
 services:
   gluetun:
-    image: qmcgaw/gluetun
+    # Version gepinnt: ein "latest", das still den gesamten Netzverkehr des
+    # Workers filtert, soll sich nicht unbemerkt aendern.
+    image: qmcgaw/gluetun:v3.40.0
     cap_add:
       - NET_ADMIN
     devices:
@@ -9,12 +11,22 @@ services:
       - VPN_SERVICE_PROVIDER=nordvpn
       - OPENVPN_USER=${NORD_USER}
       - OPENVPN_PASSWORD=${NORD_PASS}
-      - SERVER_COUNTRIES=Germany
+      - SERVER_COUNTRIES=Austria
+      # Der OpenVPN-Handshake braucht oft laenger als der gluetun-Default;
+      # sonst startet der Healthcheck den Tunnel beim Hochfahren mehrfach neu.
+      - HEALTH_VPN_DURATION_INITIAL=60s
     volumes:
       - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9999/v1/openvpn/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   mapillary_worker:
     network_mode: "service:gluetun"
     depends_on:
-      - gluetun
+      gluetun:
+        condition: service_healthy
