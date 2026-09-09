@@ -1,3 +1,11 @@
+# Expliziter Projektname. Ohne ihn leitet Compose ihn vom Verzeichnis ab, in dem
+# die Compose-Datei liegt - das waere "docker", und genau denselben Namen benutzt
+# das Schwester-Repo mapillary_trafficsigns auf demselben Server. Beide Projekte
+# teilten sich dadurch einen Container-Namensraum, und jedes `docker compose down
+# --remove-orphans` beim Start des einen Workers stoppte die laufenden Container
+# des anderen (2026-09-09: der ts-Lauf beendete den laufenden coverage-Lauf).
+name: mapillary-coverage
+
 services:
   mapillary_worker:
     build:
