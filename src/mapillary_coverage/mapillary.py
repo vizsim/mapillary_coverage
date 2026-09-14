@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 import json
 import logging
@@ -158,6 +158,49 @@ def should_download_mapillary_output(
     return True, file_mtime
 
 
+def reconnect_vpn(logger: logging.Logger, timeout: int = 420) -> bool:
+    """VPN-Tunnel ueber die gluetun-Steuer-API neu verbinden.
+
+    Nur aktiv, wenn GLUETUN_CONTROL_URL und GLUETUN_API_KEY gesetzt sind
+    (docker-compose.vpn.yml, Key in docker/.env). Ohne beides ein No-op.
+    Rueckgabe: True, wenn danach eine andere Exit-IP gemeldet wird.
+    """
+    url = os.environ.get("GLUETUN_CONTROL_URL")
+    key = os.environ.get("GLUETUN_API_KEY")
+    if not url or not key:
+        return False
+    headers = {"X-API-Key": key}
+
+    def public_ip() -> str | None:
+        try:
+            return requests.get(f"{url}/v1/publicip/ip", headers=headers, timeout=10).json().get("public_ip")
+        except Exception:
+            return None
+
+    before = public_ip()
+    try:
+        requests.put(f"{url}/v1/vpn/status", json={"status": "stopped"}, headers=headers, timeout=10)
+        time.sleep(3)
+        requests.put(f"{url}/v1/vpn/status", json={"status": "running"}, headers=headers, timeout=10)
+    except requests.RequestException as error:
+        logger.warning(f"⚠️ VPN-Neustart fehlgeschlagen: {type(error).__name__}: {str(error)[:120]}")
+        return False
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(5)
+        ip = public_ip()
+        if ip and ip != before:
+            logger.info(f"🔌 VPN neu verbunden: Exit {before or '?'} -> {ip}")
+            return True
+    logger.warning(f"⚠️ VPN nach Neustart nicht innerhalb von {timeout}s mit anderem Exit verbunden")
+    return False
+
+
+# Content-Types, die sicher kein Vector Tile sind
+NON_MVT_CONTENT_TYPES = ("text/", "application/json")
+
+
 def process_bundesland(
     bundesland_id: str,
     *,
@@ -169,7 +212,21 @@ def process_bundesland(
     min_capture_dt_utc: datetime,
     logger: logging.Logger,
     tqdm_enabled: bool = True,
+    max_fail_ratio: float = 0.02,
+    abort_after: int = 30,
+    retry_pause: int = 300,
 ) -> str | None:
+    """Ein Bundesland laden und exportieren.
+
+    Rueckgabe: Export-Zeitstempel, oder None, wenn nichts exportiert wurde.
+
+    max_fail_ratio: Anteil endgueltig fehlender Tiles, ab dem NICHT exportiert
+    wird - die vorhandene, vollstaendige Datei bleibt dann stehen, statt durch
+    einen Teilstand ersetzt zu werden.
+    abort_after: nach so vielen erfolglosen Tiles in Folge wird ein Durchlauf
+    abgebrochen, statt jede weitere Tile einzeln durchzuwiederholen. Vor der
+    naechsten Retry-Runde wird dann das VPN neu verbunden.
+    """
     logger.info(f"▶️ Starte Verarbeitung für {bundesland_id}...")
 
     tiles = load_tiles_from_json(bundesland_id, input_folder=tile_cache_folder)
@@ -181,8 +238,6 @@ def process_bundesland(
 
     tile_layer = "sequence"
     tile_coverage = "mly1_computed_public"
-    consecutive_parse_errors = 0
-    max_consecutive_errors = 5
     processed_count = 0
     successful_count = 0
 
@@ -225,7 +280,7 @@ def process_bundesland(
         )
 
     def process_tile(tile: mercantile.Tile, max_retries: int = 3) -> tuple[str, gpd.GeoDataFrame | None]:
-        nonlocal consecutive_parse_errors
+        """Rueckgabe-Status: "ok", "empty", "failed" oder "blocked" (Antwort ohne MVT-Inhalt)."""
         url = (
             f"https://tiles.mapillary.com/maps/vtp/{tile_coverage}/2/{tile.z}/{tile.x}/{tile.y}"
             f"?access_token={mapillary_access_token}"
@@ -263,6 +318,14 @@ def process_bundesland(
                     logger.warning(f"⚠️ HTTP {response.status_code} bei Tile {tile.x}/{tile.y}")
                     return "empty", None
 
+                # Antworten ohne MVT-Inhalt (etwa eine HTML-Seite mit HTTP 200)
+                # gar nicht erst parsen und nicht einzeln mit langen Pausen
+                # wiederholen - so ein Zustand trifft meist alle Tiles
+                # gleichermassen. run_batch bricht nach einer Serie ab.
+                content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+                if content_type.startswith(NON_MVT_CONTENT_TYPES) or response.content[:1] in (b"<", b"{"):
+                    return "blocked", None
+
                 geojson = vt_bytes_to_geojson(response.content, tile.x, tile.y, tile.z, layer=tile_layer)
                 features = geojson.get("features", [])
                 if not features:
@@ -279,7 +342,6 @@ def process_bundesland(
                 tile_geodataframe["captured_at"] = tile_geodataframe["captured_at"].dt.strftime("%Y-%m-%d")
                 tile_geodataframe["tile_x"] = tile.x
                 tile_geodataframe["tile_y"] = tile.y
-                consecutive_parse_errors = 0
                 return "ok", tile_geodataframe
             except (ConnectionError, ReadTimeout, Timeout, SSLError) as error:
                 wait_seconds = 300 if is_name_resolution_error(error) else 60
@@ -298,29 +360,7 @@ def process_bundesland(
             except Exception as error:
                 error_message = str(error)
                 if "Error parsing message" in error_message or "vector_tile" in error_message:
-                    consecutive_parse_errors += 1
-                    if consecutive_parse_errors >= max_consecutive_errors:
-                        logger.error(
-                            f"🛑 {max_consecutive_errors} aufeinanderfolgende Parsing-Fehler! API scheint blockiert zu sein."
-                        )
-                        logger.warning("⏸️  LANGE PAUSE: 30 Minuten warten...")
-                        time.sleep(1800)
-                        consecutive_parse_errors = 0
-                        logger.info("▶️ Setze Verarbeitung fort nach langer Pause...")
-
-                    if attempt < max_retries:
-                        logger.warning(
-                            f"⚠️ Parsing-Fehler bei Tile {tile.x}/{tile.y} "
-                            f"(Versuch {attempt + 1}/{max_retries + 1}, konsekutiv: {consecutive_parse_errors}). "
-                            f"Pausiere für 5 Minuten..."
-                        )
-                        time.sleep(300)
-                        continue
-
-                    logger.error(
-                        f"❌ Tile {tile.x}/{tile.y} nach {max_retries + 1} Parsing-Versuchen fehlgeschlagen: {error_message}"
-                    )
-                    return "failed", None
+                    return "blocked", None
 
                 if attempt < max_retries:
                     logger.warning(
@@ -338,70 +378,108 @@ def process_bundesland(
     def run_batch(
         tile_batch: list[mercantile.Tile],
         description: str,
-    ) -> tuple[list[gpd.GeoDataFrame], list[mercantile.Tile], int, int]:
+    ) -> tuple[list[gpd.GeoDataFrame], list[mercantile.Tile], int, int, str]:
+        """Tiles parallel holen. Letzter Rueckgabewert: Abbruchgrund, leer wenn kein Abbruch."""
         local_geodataframes: list[gpd.GeoDataFrame] = []
         local_failed_tiles: list[mercantile.Tile] = []
-        local_processed = 0
-        local_successful = 0
+        counts = {"processed": 0, "successful": 0, "blocked_in_streak": 0}
+        recorded: set = set()
+        aborted = ""
 
+        def record(future, tile: mercantile.Tile) -> bool:
+            """Ergebnis verbuchen. Rueckgabe: war die Tile erfolglos?"""
+            recorded.add(future)
+            try:
+                status, result = future.result()
+            except Exception as error:
+                logger.error(f"⚠️ Unbekannter Fehler bei Future {tile_key(tile)}: {error}")
+                local_failed_tiles.append(tile)
+                return True
+            counts["processed"] += 1
+            if status == "ok" and result is not None:
+                local_geodataframes.append(result)
+                counts["successful"] += 1
+                return False
+            if status in ("failed", "blocked"):
+                local_failed_tiles.append(tile)
+                if status == "blocked":
+                    counts["blocked_in_streak"] += 1
+                return True
+            return False
+
+        consecutive_misses = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(process_tile, tile): tile for tile in tile_batch}
-            for future in tqdm(as_completed(futures), total=len(futures), desc=description, disable=not tqdm_enabled):
-                tile = futures[future]
-                try:
-                    status, result = future.result()
-                    local_processed += 1
-                    if status == "ok" and result is not None:
-                        local_geodataframes.append(result)
-                        local_successful += 1
-                    elif status == "failed":
-                        local_failed_tiles.append(tile)
-                except Exception as error:
-                    logger.error(f"⚠️ Unbekannter Fehler bei Future {tile_key(tile)}: {error}")
-                    local_failed_tiles.append(tile)
+            # In Einreichungsreihenfolge verbuchen, nicht per as_completed: sonst
+            # haengt "erfolglos in Folge" von der zufaelligen Fertigstellungs-
+            # reihenfolge ab. Der Pool arbeitet trotzdem parallel.
+            for future in tqdm(futures, total=len(futures), desc=description, disable=not tqdm_enabled):
+                if record(future, futures[future]):
+                    consecutive_misses += 1
+                else:
+                    consecutive_misses = 0
+                    counts["blocked_in_streak"] = 0
+                if abort_after and consecutive_misses >= abort_after:
+                    pending = [f for f in futures if f not in recorded and f.cancel()]
+                    for pending_future in pending:
+                        recorded.add(pending_future)
+                        local_failed_tiles.append(futures[pending_future])
+                    aborted = (
+                        f"{consecutive_misses} erfolglose Tiles in Folge, "
+                        f"davon {counts['blocked_in_streak']} ohne MVT-Inhalt"
+                    )
+                    logger.warning(f"🛑 {description}: {aborted} - {len(pending)} Tiles nicht mehr versucht")
+                    break
 
-        return local_geodataframes, local_failed_tiles, local_processed, local_successful
+        # Beim Abbruch liefen noch bis zu max_workers Tiles; die sind jetzt fertig.
+        for future, tile in futures.items():
+            if future not in recorded:
+                record(future, tile)
+
+        return local_geodataframes, local_failed_tiles, counts["processed"], counts["successful"], aborted
 
     bundesland_geodataframes: list[gpd.GeoDataFrame] = []
-    round_geodataframes, failed_tiles, processed, successful = run_batch(tiles, f"🧩 {bundesland_id}")
+    round_geodataframes, failed_tiles, processed, successful, aborted = run_batch(tiles, f"🧩 {bundesland_id}")
     bundesland_geodataframes.extend(round_geodataframes)
     processed_count += processed
     successful_count += successful
 
-    if failed_tiles:
+    for round_number in (1, 2):
+        if not failed_tiles:
+            break
         failed_tiles = list({tile_key(tile): tile for tile in failed_tiles}.values())
         logger.warning(
-            f"🔁 {bundesland_id}: {len(failed_tiles)} fehlgeschlagene Tiles. Pausiere 5 Minuten vor Retry-Runde 1..."
+            f"🔁 {bundesland_id}: {len(failed_tiles)} fehlgeschlagene Tiles. "
+            f"Pausiere {retry_pause // 60} Minuten vor Retry-Runde {round_number}..."
         )
-        time.sleep(300)
-        round_geodataframes, failed_tiles, processed, successful = run_batch(
+        if aborted:
+            reconnect_vpn(logger)
+        time.sleep(retry_pause)
+        round_geodataframes, failed_tiles, processed, successful, aborted = run_batch(
             failed_tiles,
-            f"🔁 {bundesland_id} retry-1",
+            f"🔁 {bundesland_id} retry-{round_number}",
         )
         bundesland_geodataframes.extend(round_geodataframes)
         processed_count += processed
         successful_count += successful
 
-    if failed_tiles:
-        failed_tiles = list({tile_key(tile): tile for tile in failed_tiles}.values())
-        logger.warning(
-            f"🔁 {bundesland_id}: Noch {len(failed_tiles)} fehlgeschlagene Tiles. Pausiere 5 Minuten vor Retry-Runde 2..."
-        )
-        time.sleep(300)
-        round_geodataframes, failed_tiles, processed, successful = run_batch(
-            failed_tiles,
-            f"🔁 {bundesland_id} retry-2",
-        )
-        bundesland_geodataframes.extend(round_geodataframes)
-        processed_count += processed
-        successful_count += successful
-
+    failed_tiles = list({tile_key(tile): tile for tile in failed_tiles}.values())
+    fail_ratio = len(failed_tiles) / total_tiles if total_tiles else 0.0
     logger.info(
         f"✅ {bundesland_id}: {processed_count} Tile-Versuche abgeschlossen "
         f"({successful_count} erfolgreich, {processed_count - successful_count} fehlgeschlagen/ohne Daten)"
     )
     if failed_tiles:
-        logger.error(f"❌ {bundesland_id}: Nach finalen Retries bleiben {len(failed_tiles)} Tiles fehlgeschlagen.")
+        logger.error(
+            f"❌ {bundesland_id}: Nach finalen Retries bleiben {len(failed_tiles)} Tiles fehlgeschlagen ({fail_ratio:.1%})."
+        )
+
+    if fail_ratio > max_fail_ratio:
+        logger.error(
+            f"🛑 {bundesland_id} NICHT exportiert: {fail_ratio:.1%} der Tiles fehlen "
+            f"(Grenze {max_fail_ratio:.1%}). Die vorhandene Datei bleibt unverändert."
+        )
+        return None
 
     if bundesland_geodataframes:
         timestamp = export_geodata(
@@ -530,6 +608,7 @@ def run_mapillary_download_pipeline(
     skipped_current: list[str] = []
     missing_tiles: list[str] = []
     processed: list[str] = []
+    incomplete: list[str] = []
 
     for _, row in bland_filtered.iterrows():
         bundesland_id = row["id"]
@@ -565,6 +644,15 @@ def run_mapillary_download_pipeline(
         if timestamp:
             ml_timestamps[bundesland_id] = timestamp
             processed.append(bundesland_id)
+        else:
+            # Nicht exportiert: die alte Datei bleibt stehen und geht mit ihrem
+            # echten Alter in die Metadaten ein, statt dort zu verschwinden.
+            incomplete.append(bundesland_id)
+            parquet_path = os.path.join(effective_output_folder, f"mapillary_coverage_{bundesland_id}_latest.parquet")
+            if os.path.exists(parquet_path):
+                ml_timestamps[bundesland_id] = datetime.fromtimestamp(
+                    os.path.getmtime(parquet_path), tz=timezone.utc
+                ).isoformat()
 
     metadata_path: str | None = None
     if ml_timestamps:
@@ -585,6 +673,7 @@ def run_mapillary_download_pipeline(
             "freshness_lookback_months": resolved_processing["freshness_lookback_months"],
             "run_day_start_berlin": run_day_start_berlin.isoformat(),
             "freshness_cutoff_berlin": freshness_cutoff_berlin.isoformat(),
+            "last_run_incomplete": incomplete,
         }
         os.makedirs(effective_metadata_output_folder, exist_ok=True)
         metadata_path = os.path.join(effective_metadata_output_folder, "ml_metadata.json")
@@ -602,6 +691,7 @@ def run_mapillary_download_pipeline(
         "processed": processed,
         "skipped_current": skipped_current,
         "missing_tiles": missing_tiles,
+        "incomplete": incomplete,
         "timestamps": ml_timestamps,
         "metadata_path": metadata_path,
         "output_folder": effective_output_folder,
