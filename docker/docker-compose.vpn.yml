@@ -15,8 +15,14 @@ services:
       # Der OpenVPN-Handshake braucht oft laenger als der gluetun-Default;
       # sonst startet der Healthcheck den Tunnel beim Hochfahren mehrfach neu.
       - HEALTH_VPN_DURATION_INITIAL=60s
+      # Steuer-API (Port 8000 im geteilten Netz-Namespace): der Worker verbindet
+      # den Tunnel damit neu (mapillary.reconnect_vpn). Key in docker/.env.
+      - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_API_KEY}"}
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      # Serverliste, die run_and_push.sh vor jedem Start aktualisiert. Die in
+      # das Image eingebaute Liste ist teils veraltet.
+      - ../data/gluetun:/gluetun
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9999/v1/openvpn/status"]
@@ -27,6 +33,9 @@ services:
 
   mapillary_worker:
     network_mode: "service:gluetun"
+    environment:
+      - GLUETUN_CONTROL_URL=http://127.0.0.1:8000
+      - GLUETUN_API_KEY=${GLUETUN_API_KEY}
     depends_on:
       gluetun:
         condition: service_healthy

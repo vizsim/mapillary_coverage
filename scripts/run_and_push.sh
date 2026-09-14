@@ -40,7 +40,21 @@ cd docker
 # 1) Existierende Container sauber runterfahren
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
 
-# 2) Gluetun separat starten und kurz hochkommen lassen
+# 2) Serverliste aktualisieren, dann Gluetun separat starten.
+# Die in gluetun eingebaute Liste enthielt am 14.09.2026 zu 56 % Server, die es
+# nicht mehr gibt; gluetun waehlt zufaellig und brauchte dann etliche Anlaeufe.
+# Mit aktueller Liste stand der Tunnel im Test beim ersten Versuch nach 6 s.
+# Scheitert das Update, geht es mit der zuletzt gespeicherten Liste weiter.
+# Image-Version wie in docker-compose.vpn.yml.
+echo "🗺️ Aktualisiere VPN-Serverliste..."
+mkdir -p "${REPO_DIR}/data/gluetun"
+if timeout 300 docker run --rm -v "${REPO_DIR}/data/gluetun:/gluetun" \
+     qmcgaw/gluetun:v3.40.0 update -enduser -providers nordvpn >/dev/null 2>&1; then
+  echo "✅ Serverliste aktualisiert"
+else
+  echo "⚠️  Serverliste nicht aktualisiert — nutze die vorhandene"
+fi
+
 echo "🛡️ Starte Gluetun..."
 "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml up -d gluetun
 
@@ -48,10 +62,10 @@ echo "🛡️ Starte Gluetun..."
 # nicht, blockiert gluetun jeden Netzverkehr — der Worker lief dann in
 # DNS-Fehler und drehte stundenlang leer (07.09.2026: 62 h, null Ergebnisse).
 # Kommt der Tunnel nicht hoch, wird abgebrochen statt blind weiterzumachen.
-echo "⏳ Warte auf VPN (Healthcheck, max. ${VPN_WAIT_SECONDS:-300}s)..."
+echo "⏳ Warte auf VPN (Healthcheck, max. ${VPN_WAIT_SECONDS:-900}s)..."
 GLUETUN_CID="$("${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml ps -q gluetun)"
 vpn_ready=0
-for _ in $(seq 1 $(( ${VPN_WAIT_SECONDS:-300} / 5 ))); do
+for _ in $(seq 1 $(( ${VPN_WAIT_SECONDS:-900} / 5 ))); do
   if [[ "$(docker inspect -f '{{.State.Health.Status}}' "$GLUETUN_CID" 2>/dev/null)" == "healthy" ]]; then
     vpn_ready=1
     break
@@ -65,8 +79,7 @@ if [[ "$vpn_ready" -ne 1 ]]; then
   "${DOCKER_COMPOSE[@]}" -f docker-compose.yml -f docker-compose.vpn.yml down --remove-orphans || true
   exit 1
 fi
-# Exit-IP aus dem gluetun-Log, nicht ueber die Control-API: die verlangt seit
-# gluetun 3.40 einen API-Key, den dieses Setup nicht braucht.
+# Exit-IP aus dem gluetun-Log - braucht keinen API-Key.
 echo "✅ VPN steht — $(docker logs "$GLUETUN_CID" 2>&1 | grep -a 'Public IP address' | tail -1 | sed 's/.*Public IP address/Exit:/' || echo 'Exit-IP unbekannt')"
 
 # 3) Worker im bereits laufenden VPN starten und echten Worker-Exitcode übernehmen
