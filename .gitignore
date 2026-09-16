@@ -33,6 +33,11 @@ config/local.toml
 
 !*_metadata.json
 
+# Hält den Stand je Bundesland pro Lauf fest — Grundlage der Δ-Spalten im
+# output/README.md. Muss versioniert sein: geht sie verloren, hat der nächste
+# Lauf keine Referenz und die Delta-Spalten bleiben leer.
+!output/coverage_history.json
+
 # Die Coverage-CSV (33 MB pro Lauf) wird bewusst NICHT mehr ausgenommen: sie
 # liegt unter https://data.vizsim.de/mapillary_coverage/ und hat .git mit jedem
 # wöchentlichen Lauf weiter aufgebläht (16.09.2026). Im Repo bleiben nur die

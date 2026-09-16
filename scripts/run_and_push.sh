@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 CSV_PATH="output/germany_osm-highways_mp-coverage_latest.csv"  # HIER anpassen!
 README_PATH="output/README.md"
+HISTORY_PATH="output/coverage_history.json"
 
 cd "$REPO_DIR"
 
@@ -135,12 +136,21 @@ echo "☁️ Lade Outputs nach B2..."
 # Die 33-MB-CSV wird seit dem 16.09.2026 NICHT mehr committet — sie kam über B2
 # ohnehin nach data.vizsim.de, und jeder wöchentliche Lauf hat .git um weitere
 # 33 MB wachsen lassen (Stand vorher: 346 MB). Die kleinen Begleitdateien bleiben
-# im Repo (~3,5 KB pro Lauf), damit der Stand des letzten Laufs auf GitHub
+# im Repo (wenige KB pro Lauf), damit der Stand des letzten Laufs auf GitHub
 # sichtbar ist und osm_metadata.json als Cache-Marker im Tree liegen bleibt.
 echo "➕ Füge Dateien zum Commit hinzu..."
 git add -f "$README_PATH"
 git add -f output/ml_metadata.json
 git add -f output/osm_metadata.json
+
+# Die History schreibt der Export-Schritt. Beim allerersten Lauf — und wenn der
+# Export übersprungen wurde, weil die CSV noch aktuell genug war — gibt es sie
+# nicht. `git add -f` auf eine fehlende Datei wäre unter `set -e` ein Abbruch.
+if [ -f "$HISTORY_PATH" ]; then
+  git add -f "$HISTORY_PATH"
+else
+  echo "ℹ️ Keine $HISTORY_PATH — Delta-Historie wird beim nächsten Export angelegt."
+fi
 
 # ---------------------------
 # 🧹 Prüfen, ob es Änderungen gibt

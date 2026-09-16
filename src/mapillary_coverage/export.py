@@ -222,28 +222,172 @@ def combine_coverage_frames(
     return both_concat
 
 
-def create_readme(summary_df: pd.DataFrame, metadata: dict[str, Any], processing_config: dict[str, Any]) -> str:
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    summary_table = summary_df.pivot(index="Bundesland", columns="Typ", values="Gesamtlänge (km)").fillna(0).reset_index()
+COVERAGE_HISTORY_FILENAME = "coverage_history.json"
+NO_VALUE = "—"
+
+
+def history_output_path(output_folder: str) -> Path:
+    return Path(output_folder) / COVERAGE_HISTORY_FILENAME
+
+
+def load_coverage_history(output_folder: str, emit: MessageEmitter | None = print) -> list[dict[str, Any]]:
+    """Bisherige Läufe in chronologischer Reihenfolge.
+
+    Fehlt die Datei oder ist sie beschädigt, wird das nicht als Fehler behandelt:
+    dann entfallen nur die Delta-Spalten im README, der Export läuft weiter.
+    """
+    path = history_output_path(output_folder)
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as file_handle:
+            data = json.load(file_handle)
+    except (OSError, json.JSONDecodeError) as error:
+        _emit(f"  ⚠️  History nicht lesbar ({error}) → Deltas entfallen", emit)
+        return []
+
+    runs = data.get("runs") if isinstance(data, dict) else None
+    if not isinstance(runs, list):
+        return []
+    return [run for run in runs if isinstance(run, dict)]
+
+
+def latest_totals_per_bundesland(runs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Letzter bekannter Stand je Bundesland, mit dem Datum des Laufs.
+
+    Bewusst nicht einfach der letzte Lauf als Ganzes: Validierungsläufe mit
+    `bundeslaender`-Override in config/local.toml schreiben nur eine Teilmenge.
+    Alle übrigen Bundesländer sollen sich trotzdem mit dem letzten Lauf
+    vergleichen, der sie enthielt — sonst stünde nach so einem Lauf überall NO_VALUE.
+    """
+    totals: dict[str, dict[str, Any]] = {}
+    for run in runs:
+        entries = run.get("bundeslaender")
+        if not isinstance(entries, dict):
+            continue
+        for bundesland, values in entries.items():
+            if not isinstance(values, dict):
+                continue
+            totals[str(bundesland)] = {
+                "pano": values.get("pano"),
+                "regular": values.get("regular"),
+                "date": run.get("date"),
+            }
+    return totals
+
+
+def append_coverage_history(
+    output_folder: str,
+    run_date: str,
+    totals: dict[str, dict[str, float]],
+    emit: MessageEmitter | None = print,
+) -> Path:
+    """Aktuellen Lauf in die History schreiben — ein Eintrag pro Datum.
+
+    Ein Lauf am selben Tag (z. B. Wiederholung nach Abbruch) ersetzt bzw. ergänzt
+    den vorhandenen Eintrag. Sonst wäre die Referenz des nächsten Laufs der
+    Rerun von heute und alle Deltas nahe null.
+    """
+    path = history_output_path(output_folder)
+    runs = load_coverage_history(output_folder, emit=emit)
+
+    same_day = next((run for run in runs if run.get("date") == run_date), None)
+    if same_day is None:
+        runs.append({"date": run_date, "bundeslaender": dict(totals)})
+    else:
+        existing = same_day.get("bundeslaender")
+        same_day["bundeslaender"] = {**(existing if isinstance(existing, dict) else {}), **totals}
+
+    with path.open("w", encoding="utf-8") as file_handle:
+        json.dump({"runs": runs}, file_handle, indent=2, ensure_ascii=False)
+        file_handle.write("\n")
+    _emit(f"✅ History aktualisiert: {path} ({len(runs)} Läufe)", emit)
+    return path
+
+
+def pivot_summary(summary_df: pd.DataFrame) -> pd.DataFrame:
+    return summary_df.pivot(index="Bundesland", columns="Typ", values="Gesamtlänge (km)").fillna(0).reset_index()
+
+
+def summary_totals(summary_df: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """{Bundesland: {"pano": km, "regular": km}} — die Form, die in der History landet."""
+    totals: dict[str, dict[str, float]] = {}
+    for _, row in pivot_summary(summary_df).iterrows():
+        totals[str(row["Bundesland"])] = {
+            "pano": round(float(row["pano"]), 2) if "pano" in row else 0.0,
+            "regular": round(float(row["regular"]), 2) if "regular" in row else 0.0,
+        }
+    return totals
+
+
+def format_delta(current: float, previous: Any) -> str:
+    """Differenz mit Vorzeichen; ohne Vergleichswert NO_VALUE."""
+    if previous is None:
+        return NO_VALUE
+    try:
+        return f"{current - float(previous):+,.2f}"
+    except (TypeError, ValueError):
+        return NO_VALUE
+
+
+def create_readme(
+    summary_df: pd.DataFrame,
+    metadata: dict[str, Any],
+    processing_config: dict[str, Any],
+    previous_totals: dict[str, dict[str, Any]] | None = None,
+    run_date: str | None = None,
+) -> str:
+    current_date = run_date or datetime.now().strftime("%Y-%m-%d")
+    previous_totals = previous_totals or {}
+    summary_table = pivot_summary(summary_df)
 
     osm_bl = metadata.get("osm_bundeslaender", {})
     ml_bl = metadata.get("ml_bundeslaender", {})
-    table_header = "| Bundesland | Pano (km) | Regular (km) | OSM Datum | Mapillary Datum |\n|------------|-----------|--------------|-----------|-----------------|"
+    # Zahlen rechtsbündig (:---: bzw. ---:), Text linksbündig.
+    table_header = (
+        "| Bundesland | Pano (km) | Δ Pano (km) | Regular (km) | Δ Regular (km) | OSM Date | Mapillary Date |\n"
+        "|:-----------|----------:|------------:|-------------:|---------------:|:---------|:---------------|"
+    )
     table_rows: list[str] = []
+    reference_dates: set[str] = set()
 
     for _, row in summary_table.iterrows():
         bundesland = row["Bundesland"]
-        pano_km = f"{row.get('pano', 0):,.2f}" if "pano" in row else "0.00"
-        regular_km = f"{row.get('regular', 0):,.2f}" if "regular" in row else "0.00"
+        pano_value = float(row["pano"]) if "pano" in row else 0.0
+        regular_value = float(row["regular"]) if "regular" in row else 0.0
+        previous = previous_totals.get(bundesland) or {}
+        if previous.get("date") and (previous.get("pano") is not None or previous.get("regular") is not None):
+            reference_dates.add(str(previous["date"]))
+
         osm_date = osm_bl.get(bundesland, "N/A")
         ml_date = ml_bl.get(bundesland, "N/A")
         if osm_date != "N/A":
             osm_date = osm_date.split("T")[0]
         if ml_date != "N/A":
             ml_date = ml_date.split("T")[0]
-        table_rows.append(f"| {bundesland} | {pano_km} | {regular_km} | {osm_date} | {ml_date} |")
+
+        table_rows.append(
+            f"| {bundesland} | {pano_value:,.2f} | {format_delta(pano_value, previous.get('pano'))} "
+            f"| {regular_value:,.2f} | {format_delta(regular_value, previous.get('regular'))} "
+            f"| {osm_date} | {ml_date} |"
+        )
 
     markdown_table = "\n".join([table_header] + table_rows)
+
+    if not reference_dates:
+        reference_label = None
+        delta_note = "The Δ columns stay empty until a second run has been recorded."
+    elif len(reference_dates) == 1:
+        reference_label = next(iter(reference_dates))
+        delta_note = f"The Δ columns show the change since the previous run ({reference_label})."
+    else:
+        reference_label = f"{min(reference_dates)} – {max(reference_dates)}"
+        delta_note = (
+            "The Δ columns show the change since each Bundesland's previous run "
+            f"({reference_label}) — the runs compared against differ because an earlier run "
+            "covered only a subset."
+        )
+
     osm_date = metadata["osm_data_from"].split("T")[0] if metadata["osm_data_from"] else "N/A"
     ml_date = metadata["ml_data_from"].split("T")[0] if metadata["ml_data_from"] else "N/A"
     freshness_start = metadata.get("freshness_cutoff_berlin")
@@ -252,23 +396,33 @@ def create_readme(summary_df: pd.DataFrame, metadata: dict[str, Any], processing
     else:
         freshness_start = compute_freshness_cutoff_date(processing_config)
 
+    property_rows = [f"| **Data created** | {current_date} |"]
+    if reference_label:
+        property_rows.append(f"| **Previous run** | {reference_label} |")
+    property_rows.extend(
+        [
+            f"| **OSM data** | {osm_date} |",
+            f"| **Mapillary data** | {freshness_start} → {ml_date} |",
+            f"| **Buffer distance** | {processing_config['buffer_distance']} meters |",
+            f"| **Coverage ratio threshold** | {processing_config['mp_coverage_ratio_threshold']} "
+            f"({int(processing_config['mp_coverage_ratio_threshold'] * 100)}%) |",
+        ]
+    )
+    property_table = "\n".join(["| Property | Value |", "|:---------|------:|"] + property_rows)
+
     return f"""# Mapillary Coverage per OSM Highway — Output
 
 This folder contains the **latest** output file for *Mapillary coverage per OSM highway analysis*.
 
-| Property | Value |
-|----------|-------|
-| **Data created** | {current_date} |
-| **OSM data** | {osm_date} |
-| **Mapillary data** | {freshness_start} → {ml_date} |
-| **Buffer distance** | {processing_config['buffer_distance']} meters |
-| **Coverage ratio threshold** | {processing_config['mp_coverage_ratio_threshold']} ({int(processing_config['mp_coverage_ratio_threshold'] * 100)}%) |
+{property_table}
 
 Segments are considered *covered* if at least {int(processing_config['mp_coverage_ratio_threshold'] * 100)}% of their length falls within {processing_config['buffer_distance']} meters of Mapillary images.
 
 ## Summary by Bundesland
 
 {markdown_table}
+
+{delta_note}
 """
 
 
@@ -373,11 +527,21 @@ def run_export_csv_pipeline(
     _emit(f"{'=' * 70}", emit)
 
     if not summary_df.empty:
-        readme_content = create_readme(summary_df, metadata, resolved_processing)
+        # History VOR dem Schreiben lesen — sonst wäre die Referenz der aktuelle Lauf.
+        run_date = datetime.now().strftime("%Y-%m-%d")
+        previous_totals = latest_totals_per_bundesland(load_coverage_history(target_folder, emit=emit))
+        readme_content = create_readme(
+            summary_df,
+            metadata,
+            resolved_processing,
+            previous_totals=previous_totals,
+            run_date=run_date,
+        )
         readme_path = readme_output_path(target_folder)
         with readme_path.open("w", encoding="utf-8") as file_handle:
             file_handle.write(readme_content)
         _emit(f"\n✅ README erstellt: {readme_path}", emit)
+        append_coverage_history(target_folder, run_date, summary_totals(summary_df), emit=emit)
 
     _emit(f"\n{'=' * 70}", emit)
     _emit("✅ FERTIG!", emit)
