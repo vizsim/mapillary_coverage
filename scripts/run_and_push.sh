@@ -122,17 +122,22 @@ fi
 # ---------------------------
 # ☁️ Outputs nach B2 hochladen (öffentliches Archiv → data.vizsim.de/mapillary_coverage)
 # ---------------------------
-# Läuft unabhängig vom git-Commit (auch wenn es keine Diffs gibt). Defensive —
-# fehlt b2-CLI/Creds, wird nur gewarnt und der Lauf NICHT abgebrochen.
+# Der B2-Upload ist der Veröffentlichungsweg für die CSV. Er läuft unabhängig vom
+# git-Commit (auch wenn es keine Diffs gibt). Defensive — fehlt b2-CLI/Creds,
+# wird nur gewarnt und der Lauf NICHT abgebrochen.
 echo "☁️ Lade Outputs nach B2..."
 "${SCRIPT_DIR}/upload_outputs_to_b2.sh" || \
   echo "⚠️  B2-Upload meldete einen Fehler — Lauf wird trotzdem fortgesetzt."
 
 # ---------------------------
-# ➕ Dateien zum Commit hinzufügen (Outputs und Metadata)
+# ➕ Dateien zum Commit hinzufügen (nur Metadata, nicht die CSV)
 # ---------------------------
+# Die 33-MB-CSV wird seit dem 16.09.2026 NICHT mehr committet — sie kam über B2
+# ohnehin nach data.vizsim.de, und jeder wöchentliche Lauf hat .git um weitere
+# 33 MB wachsen lassen (Stand vorher: 346 MB). Die kleinen Begleitdateien bleiben
+# im Repo (~3,5 KB pro Lauf), damit der Stand des letzten Laufs auf GitHub
+# sichtbar ist und osm_metadata.json als Cache-Marker im Tree liegen bleibt.
 echo "➕ Füge Dateien zum Commit hinzu..."
-git add -f "$CSV_PATH"
 git add -f "$README_PATH"
 git add -f output/ml_metadata.json
 git add -f output/osm_metadata.json
@@ -141,14 +146,15 @@ git add -f output/osm_metadata.json
 # 🧹 Prüfen, ob es Änderungen gibt
 # ---------------------------
 if git diff --cached --quiet; then
-  echo "ℹ️ Keine Änderungen an Outputs oder Metadata — nichts zu committen."
+  echo "ℹ️ Keine Änderungen an Metadata — nichts zu committen."
+  echo "🎉 Fertig — CSV liegt unter https://data.vizsim.de/mapillary_coverage/"
   exit 0
 fi
 
 # ---------------------------
 # ✍️ Commit erstellen
 # ---------------------------
-COMMIT_MSG="Auto-update: outputs and metadata ($(date -Iseconds))"
+COMMIT_MSG="Auto-update: metadata ($(date -Iseconds))"
 
 echo "✍️ Committe Änderungen: $COMMIT_MSG"
 git commit -m "$COMMIT_MSG"
@@ -159,4 +165,4 @@ git commit -m "$COMMIT_MSG"
 echo "🚀 Push nach GitHub..."
 git push origin "$BRANCH"
 
-echo "🎉 Fertig — Änderungen sind online!"
+echo "🎉 Fertig — CSV liegt unter https://data.vizsim.de/mapillary_coverage/"

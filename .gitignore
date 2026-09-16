@@ -33,4 +33,8 @@ config/local.toml
 
 !*_metadata.json
 
-!output/germany_osm-highways_mp-coverage_latest.csv
+# Die Coverage-CSV (33 MB pro Lauf) wird bewusst NICHT mehr ausgenommen: sie
+# liegt unter https://data.vizsim.de/mapillary_coverage/ und hat .git mit jedem
+# wöchentlichen Lauf weiter aufgebläht (16.09.2026). Im Repo bleiben nur die
+# kleinen Begleitdateien (output/README.md + Metadata-JSON), damit der Stand des
+# letzten Laufs auf GitHub sichtbar bleibt. Für die CSV greift jetzt *.csv oben.

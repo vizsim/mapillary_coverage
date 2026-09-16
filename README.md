@@ -105,7 +105,10 @@ Remove the override again before a full Germany run.
 
 ## Result
 
-The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output) holds CSV files of the last runs.
+The coverage CSV of the latest run is published at
+[data.vizsim.de/mapillary_coverage](https://data.vizsim.de/mapillary_coverage/).
+The [`/output` folder](https://github.com/vizsim/mapillary_coverage/tree/main/output)
+holds the accompanying README and the run metadata.
 
 ## License
 
