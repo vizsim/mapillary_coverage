@@ -301,8 +301,9 @@ def run_merge_for_bundesland(
     _log(f"        → Regular: {len(mapillary_regular):,} Polygone", logger=logger, emit=emit)
 
     _log(f"  [2/6] Lade OSM-Highways für {bundesland_code} aus PBF...", logger=logger, emit=emit)
-    osm_bundesland = load_osm_highways_pbf(osm_pbf_file)
-    osm_bundesland = osm_bundesland.to_crs(25832)
+    # Transformation gleich beim Laden, nicht per to_crs auf dem fertigen Frame -
+    # das halbiert bei den grossen Bundeslaendern den Speicher-Peak.
+    osm_bundesland = load_osm_highways_pbf(osm_pbf_file, target_crs=25832)
     osm_bundesland["length_m_before_clip"] = osm_bundesland.geometry.length
     osm_bundesland = osm_bundesland[["osm_id", "highway", "geometry", "length_m_before_clip"]].copy()
     if max_roads is not None:

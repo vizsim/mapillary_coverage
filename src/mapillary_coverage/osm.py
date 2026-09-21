@@ -6,14 +6,17 @@ import os
 from pathlib import Path
 import random
 import subprocess
+import sys
 import time
 from typing import Any, Callable
 
 import geopandas as gpd
+import numpy as np
 import osmium
+import pandas as pd
 import requests
 from requests.adapters import HTTPAdapter
-import shapely.wkb as wkblib
+import shapely
 from tqdm import tqdm
 from urllib3.util import Retry
 
@@ -24,27 +27,38 @@ MessageEmitter = Callable[[str], None]
 
 
 class HighwayHandler(osmium.SimpleHandler):
+    """Sammelt Highway-Ways als parallele Listen.
+
+    Bewusst keine Liste von dicts und kein `shapely.wkb.loads` je Way: bei
+    DE-BY sind das 3,1 Mio Python-Aufrufe. Das WKB wird spaeter in Bloecken
+    per `shapely.from_wkb` umgewandelt - ein C-Aufruf je Block.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self.wkbfab = osmium.geom.WKBFactory()
-        self.data: list[dict[str, Any]] = []
+        self.osm_ids: list[int] = []
+        self.highways: list[str] = []
+        self.wkb: list[str] = []
 
     def way(self, way: Any) -> None:
         if "highway" not in way.tags:
             return
 
         try:
+            # Wirft bei Ways mit weniger als zwei Knoten - die werden wie
+            # zuvor still uebersprungen.
             wkb = self.wkbfab.create_linestring(way)
-            linestring = wkblib.loads(wkb, hex=True)
-            self.data.append(
-                {
-                    "osm_id": way.id,
-                    "highway": way.tags.get("highway"),
-                    "geometry": linestring,
-                }
-            )
         except Exception:
-            pass
+            return
+
+        self.osm_ids.append(way.id)
+        # intern(): ~30 verschiedene Werte auf Millionen Zeilen. Ohne das liegt
+        # je Way ein eigenes str-Objekt im Speicher (~150 MB bei DE-BY), mit
+        # intern() nur ein Zeiger auf einen gemeinsamen. Die Spalte bleibt
+        # object-dtype, das Parquet-Schema aendert sich also nicht.
+        self.highways.append(sys.intern(way.tags.get("highway")))
+        self.wkb.append(wkb)
 
 
 def _emit(message: str, emit: MessageEmitter | None) -> None:
@@ -347,10 +361,74 @@ def get_osm_timestamp(pbf_file: str | Path) -> str | None:
         return None
 
 
-def load_osm_highways_pbf(file_path: str | Path, crs: str = "EPSG:4326") -> gpd.GeoDataFrame:
+def _geometries_from_wkb(
+    wkb_hex: list[str],
+    *,
+    source_crs: Any,
+    target_crs: Any | None,
+    block_size: int,
+) -> np.ndarray:
+    """Wandelt WKB-Hex blockweise in Geometrien um, optional gleich ins Ziel-CRS.
+
+    Blockweise, weil beides sonst den Speicher-Peak treibt: `to_crs` zieht
+    intern *alle* Koordinaten in ein Array und setzt sie auf eine Kopie *aller*
+    Geometrien (geopandas/array.py::transform). Bei DE-BY waren das 2,45 GB nach
+    dem Parsen -> 4,33 GB nach to_crs, gegen mem_limit 6g. Pro Block bleibt der
+    Zusatzbedarf klein, und die Hex-Strings des Blocks werden sofort freigegeben,
+    damit Quelle und Ergebnis nicht gleichzeitig komplett im Speicher liegen.
+
+    Transformiert wird ueber die oeffentliche GeoSeries.to_crs, nicht ueber
+    geopandas-Interna - damit ist das Ergebnis identisch zu einem to_crs auf dem
+    ganzen Frame.
+    """
+    total = len(wkb_hex)
+    geometries = np.empty(total, dtype=object)
+
+    for start in range(0, total, block_size):
+        stop = min(start + block_size, total)
+        # on_invalid="warn": frueher verschluckte ein try/except je Way kaputtes
+        # WKB still. Jetzt wird es sichtbar und die Zeile fliegt unten raus.
+        block = shapely.from_wkb(np.array(wkb_hex[start:stop], dtype=object), on_invalid="warn")
+        if target_crs is not None:
+            block = np.asarray(gpd.GeoSeries(block, crs=source_crs).to_crs(target_crs))
+        geometries[start:stop] = block
+        wkb_hex[start:stop] = [None] * (stop - start)
+        del block
+
+    return geometries
+
+
+def load_osm_highways_pbf(
+    file_path: str | Path,
+    crs: str = "EPSG:4326",
+    *,
+    target_crs: Any | None = None,
+    block_size: int = 200_000,
+) -> gpd.GeoDataFrame:
+    """Laedt Highway-Ways aus einem PBF.
+
+    `target_crs` transformiert gleich beim Laden - das ist speicherschonender
+    als ein `to_crs` auf dem fertigen Frame, siehe `_geometries_from_wkb`.
+    """
     handler = HighwayHandler()
     handler.apply_file(str(file_path), locations=True)
-    return gpd.GeoDataFrame(handler.data, geometry="geometry", crs=crs)
+
+    geometries = _geometries_from_wkb(
+        handler.wkb,
+        source_crs=crs,
+        target_crs=target_crs,
+        block_size=block_size,
+    )
+    frame = gpd.GeoDataFrame(
+        {"osm_id": np.asarray(handler.osm_ids, dtype="int64"), "highway": handler.highways},
+        geometry=gpd.GeoSeries(geometries, crs=target_crs if target_crs is not None else crs),
+    )
+    del handler, geometries
+
+    missing = frame.geometry.isna()
+    if missing.any():
+        frame = frame[~missing].reset_index(drop=True)
+    return frame
 
 
 def run_osm_prepare_pipeline(
