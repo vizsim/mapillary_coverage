@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
-from shapely.geometry import box
+import shapely
 from tqdm import tqdm
 
 from mapillary_coverage.bundeslaender import filter_mapping_by_bundeslaender
@@ -138,22 +139,62 @@ def should_process_coverage(
         return True
 
 
-def spatial_filter(gdf: gpd.GeoDataFrame, geom: Any) -> gpd.GeoDataFrame:
-    if gdf.empty:
-        return gdf
-    idx = gdf.sindex.query(geom, predicate="intersects")
-    return gdf.iloc[idx]
-
-
-def _materialize_coverage_parts(
-    clipped_parts: list[gpd.GeoDataFrame],
-    temp_files: list[str],
+def _clip_roads_block(
+    roads_block: gpd.GeoDataFrame,
+    buffer_geoms: np.ndarray,
+    buffer_sindex: Any,
     *,
     crs: Any,
-) -> list[gpd.GeoDataFrame]:
+) -> gpd.GeoDataFrame | None:
+    """Verschneidet einen Block Straßen mit den Mapillary-Buffern.
+
+    Ein einziger STRtree-Query für den ganzen Block statt eines pro Straße. Das
+    Ergebnis ist dasselbe wie ein `gpd.clip` je Straße gegen die bbox-gefilterten
+    Buffer: Straße ∩ (B₁ ∪ B₂) = (Straße ∩ B₁) ∪ (Straße ∩ B₂), und Buffer, die
+    nur die bbox der Straße berühren, tragen zur Verschneidung nichts bei.
+    """
+    road_geoms = roads_block.geometry.values
+    road_pos, buffer_pos = buffer_sindex.query(road_geoms, predicate="intersects")
+    if len(road_pos) == 0:
+        return None
+
+    # Treffer je Straße gruppieren
+    order = np.argsort(road_pos, kind="stable")
+    road_pos, buffer_pos = road_pos[order], buffer_pos[order]
+    hit_rows, group_start, group_size = np.unique(road_pos, return_index=True, return_counts=True)
+
+    clipped = np.empty(len(hit_rows), dtype=object)
+
+    # Ein Buffer je Straße - das ist der Normalfall (~94 %) und braucht keine
+    # Union. Ein vektorisierter shapely-Aufruf fuer alle davon.
+    single = group_size == 1
+    if single.any():
+        clipped[single] = shapely.intersection(
+            road_geoms[hit_rows[single]], buffer_geoms[buffer_pos[group_start[single]]]
+        )
+
+    # Mehrere Buffer: erst die POLYGONE vereinigen, dann einmal verschneiden -
+    # genau wie gpd.clip es tut. Erst paarweise zu verschneiden und die Linien-
+    # stuecke danach zu vereinigen ist falsch: union_all dedupliziert ueber-
+    # lappende Linien nicht zuverlaessig und zaehlt die Laenge doppelt (gemessen:
+    # 2.337 m Abdeckung auf einer 2.298 m langen Strasse).
+    for i in np.nonzero(~single)[0]:
+        start, size = group_start[i], group_size[i]
+        mask = shapely.union_all(buffer_geoms[buffer_pos[start : start + size]])
+        clipped[i] = shapely.intersection(road_geoms[hit_rows[i]], mask)
+
+    keep = ~(shapely.is_missing(clipped) | shapely.is_empty(clipped))
+    hit_rows, clipped = hit_rows[keep], clipped[keep]
+    if len(hit_rows) == 0:
+        return None
+
+    result = roads_block.iloc[hit_rows].copy()
+    result["geometry"] = gpd.GeoSeries(clipped, crs=crs, index=result.index)
+    return result
+
+
+def _materialize_coverage_parts(temp_files: list[str]) -> list[gpd.GeoDataFrame]:
     all_parts: list[gpd.GeoDataFrame] = []
-    if clipped_parts:
-        all_parts.append(gpd.GeoDataFrame(pd.concat(clipped_parts, ignore_index=True), crs=crs))
     for temp_file in temp_files:
         all_parts.append(gpd.read_parquet(temp_file))
         os.remove(temp_file)
@@ -180,37 +221,39 @@ def _compute_coverage_variant(
         emit=emit,
     )
 
-    clipped_parts: list[gpd.GeoDataFrame] = []
     temp_files: list[str] = []
     total_roads = len(osm_bundesland)
 
-    for road_idx, (_, road) in enumerate(
-        tqdm(osm_bundesland.iterrows(), total=total_roads, desc=f"{bundesland_code} {variant_title}", leave=False),
-        1,
+    # Baum und Geometrie-Array einmal fuer alle Blocks. write_chunk_size bleibt
+    # der Speicher-Regler: es ist die Blockgroesse und gleichzeitig der Punkt,
+    # an dem Zwischenergebnisse auf Platte gehen.
+    buffer_geoms = mapillary_variant.geometry.values
+    buffer_sindex = mapillary_variant.sindex
+
+    block_starts = range(0, total_roads, write_chunk_size)
+    for block_start in tqdm(
+        block_starts, total=len(block_starts), desc=f"{bundesland_code} {variant_title}", leave=False
     ):
-        bbox = box(*road.geometry.bounds)
-        filtered = spatial_filter(mapillary_variant, bbox)
-        if not filtered.empty:
-            clipped = gpd.clip(gpd.GeoDataFrame([road], crs=osm_bundesland.crs), filtered)
-            if not clipped.empty:
-                clipped_parts.append(clipped)
+        block = osm_bundesland.iloc[block_start : block_start + write_chunk_size]
+        clipped = _clip_roads_block(block, buffer_geoms, buffer_sindex, crs=osm_bundesland.crs)
+        if clipped is None:
+            continue
 
-        if road_idx % write_chunk_size == 0 and clipped_parts:
-            chunk_gdf = gpd.GeoDataFrame(pd.concat(clipped_parts, ignore_index=True), crs=osm_bundesland.crs)
-            temp_file = f"{output_folder}/.temp_{bundesland_code}_{variant_name}_chunk_{road_idx}.parquet"
-            chunk_gdf.to_parquet(temp_file)
-            temp_files.append(temp_file)
-            _log(
-                f"    Chunk {road_idx:,}/{total_roads:,} → temp file ({len(chunk_gdf):,} Straßen)",
-                logger=logger,
-                level="debug",
-                emit=emit,
-            )
-            del chunk_gdf
-            clipped_parts = []
-            gc.collect()
+        road_idx = min(block_start + write_chunk_size, total_roads)
+        chunk_gdf = gpd.GeoDataFrame(clipped, crs=osm_bundesland.crs)
+        temp_file = f"{output_folder}/.temp_{bundesland_code}_{variant_name}_chunk_{road_idx}.parquet"
+        chunk_gdf.to_parquet(temp_file)
+        temp_files.append(temp_file)
+        _log(
+            f"    Chunk {road_idx:,}/{total_roads:,} → temp file ({len(chunk_gdf):,} Straßen)",
+            logger=logger,
+            level="debug",
+            emit=emit,
+        )
+        del chunk_gdf, clipped
+        gc.collect()
 
-    all_parts = _materialize_coverage_parts(clipped_parts, temp_files, crs=osm_bundesland.crs)
+    all_parts = _materialize_coverage_parts(temp_files)
     if not all_parts:
         _log(f"        → 0 Straßen mit {variant_title}-Abdeckung", logger=logger, emit=emit)
         gc.collect()
