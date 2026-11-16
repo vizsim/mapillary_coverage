@@ -1655,6 +1655,75 @@
           "regular": 11784.14
         }
       }
+    },
+    {
+      "date": "2026-11-16",
+      "bundeslaender": {
+        "DE-BB": {
+          "pano": 26221.56,
+          "regular": 34788.91
+        },
+        "DE-BE": {
+          "pano": 9933.66,
+          "regular": 11717.36
+        },
+        "DE-BW": {
+          "pano": 43430.88,
+          "regular": 72566.21
+        },
+        "DE-BY": {
+          "pano": 29173.33,
+          "regular": 70781.54
+        },
+        "DE-HB": {
+          "pano": 112.91,
+          "regular": 1445.78
+        },
+        "DE-HE": {
+          "pano": 10908.15,
+          "regular": 32881.81
+        },
+        "DE-HH": {
+          "pano": 386.58,
+          "regular": 5073.34
+        },
+        "DE-MV": {
+          "pano": 3743.77,
+          "regular": 9825.78
+        },
+        "DE-NI": {
+          "pano": 13254.09,
+          "regular": 63428.06
+        },
+        "DE-NW": {
+          "pano": 8838.23,
+          "regular": 84237.52
+        },
+        "DE-RP": {
+          "pano": 9328.84,
+          "regular": 39264.91
+        },
+        "DE-SH": {
+          "pano": 1198.62,
+          "regular": 20868.35
+        },
+        "DE-SL": {
+          "pano": 635.96,
+          "regular": 4499.86
+        },
+        "DE-SN": {
+          "pano": 4541.62,
+          "regular": 24642.11
+        },
+        "DE-ST": {
+          "pano": 10653.62,
+          "regular": 19918.05
+        },
+        "DE-TH": {
+          "pano": 4067.38,
+          "regular": 11709.82
+        }
+      }
     }
   ]
 }
